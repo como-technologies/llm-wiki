@@ -166,6 +166,30 @@ Full tool reference: [`docs/specifications/tools/`](docs/specifications/tools/)
 
 ---
 
+## Stable page ids
+
+By default a page's identity is its path, so moving a file breaks every
+inbound link. A page may opt in to a **stable id** — a tool-generated
+ULID in frontmatter:
+
+```yaml
+---
+id: 01ARZ3NDEKTSV4RRFFQ69G5FAV
+title: "Use Postgres"
+type: doc
+---
+```
+
+Links and addresses (`[[01ARZ…]]`, `superseded_by: 01ARZ…`,
+`wiki_content_read(uri: "01ARZ…")`) resolve by slug first, then by id —
+so id links survive `git mv` and existing slug links behave exactly as
+before. `content new --id` generates one; `lint` enforces uniqueness
+(`duplicate-id`) and shape (`id-format`). Wikis without ids are
+unaffected. Full contract:
+[`docs/specifications/model/page-identity.md`](docs/specifications/model/page-identity.md).
+
+---
+
 ## Skills
 
 The engine exposes tools. Skills tell agents how to use them.

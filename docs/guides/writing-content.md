@@ -163,6 +163,32 @@ possible inline reference in a wiki-only context.
 External URLs (`https://…`), anchors (`#section`), and image links
 (`![alt](path)`) are not indexed.
 
+## Stable page ids
+
+A slug link breaks when the target file moves. For pages you expect to
+reorganize, give the target a **stable id** — a tool-generated ULID in
+frontmatter — and link to the id instead:
+
+```
+llm-wiki content new guides/setup --id
+Created: wiki://research/guides/setup (id: 01ARZ3NDEKTSV4RRFFQ69G5FAV)
+```
+
+Then reference it from other pages as `[[01ARZ3NDEKTSV4RRFFQ69G5FAV]]`
+or in a typed edge field (`superseded_by: 01ARZ3NDEKTSV4RRFFQ69G5FAV`).
+After a `git mv` and re-ingest, id links still resolve — only slug links
+to the old path dangle.
+
+To adopt an id on an existing page, add the `id` field to its
+frontmatter (generate one with `--id` on a scratch page or any ULID
+tool), then re-ingest. Ids must be unique per space (`duplicate-id` lint
+error) and are always opaque ULIDs — never hand-authored, meaningful
+identifiers. Ids also work as addresses everywhere a slug is accepted:
+`wiki_content_read(uri: "01ARZ…")`, `wiki_resolve`, `history`, and
+`suggest`. See
+[specifications/model/page-identity.md](../specifications/model/page-identity.md)
+for the full contract.
+
 ## Choosing the right tool
 
 | Goal | Tool |

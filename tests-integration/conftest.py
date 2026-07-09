@@ -26,6 +26,7 @@ def _init_wiki(src: Path, dest: Path) -> None:
         [
             "git", "-C", str(dest),
             "-c", "user.name=test", "-c", "user.email=test@test.com",
+            "-c", "commit.gpgsign=false",
             "commit", "-qm", "init",
         ],
         check=True,
@@ -81,6 +82,7 @@ def wiki_env(binary: str, tmp_path: Path) -> WikiEnv:
         [
             "git", "-C", str(research),
             "-c", "user.name=test", "-c", "user.email=test@test.com",
+            "-c", "commit.gpgsign=false",
             "commit", "-qm", "add inbox", "--allow-empty",
         ],
         check=True,

@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Stable page identity (`id`)** — a page may declare an optional `id` in frontmatter: a tool-generated ULID that survives file moves and renames. Resolution is slug-first, id-second everywhere an address or link target is accepted (`wiki://` URIs, bare addresses, `[[wikilinks]]`, `x-graph-edges` fields, MCP `wiki_resolve`/`wiki_content_read`/resources), so existing slug links behave exactly as before and id links keep resolving after `git mv` + re-index. Ids surface in `search`/`list`/`export`/graph output and MCP responses (omitted when absent — JSON is unchanged for id-free wikis). `content new --id` generates a ULID (`--id <ULID>` uses a given one); MCP `wiki_content_new` gains `id`/`auto_id`. New lint rules: `duplicate-id` (error) and `id-format` (warning). Spec: `docs/specifications/model/page-identity.md`
+- `id` property in `schemas/base.json` and the concept/doc/paper/skill type schemas — note the schema-hash change triggers one automatic partial index rebuild on first mount after upgrade
+- pytest suite `tests-integration/engine/test_page_id.py` — includes the move acceptance test: an id link shows zero `broken-link` errors after the target file is moved
+
+### Changed
+
+- Graph snapshot name bumped to `wiki-graph-v2` — `PageNode` gained the `id` field, making old bincode snapshots layout-incompatible; each space rebuilds its graph snapshot once
+
+### Fixed
+
+- Pinned `agent-client-protocol` to 0.14 — the 0.15 bump (#78) landed without migrating `src/acp` to the restructured `schema` module, leaving `main` uncompilable
+
 ## [0.4.1] -  2026-05-08
 
 ### Added

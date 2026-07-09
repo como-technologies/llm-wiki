@@ -6,6 +6,11 @@
   "type": "object",
   "required": ["title", "type", "read_when"],
   "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "Stable opaque page identifier (ULID, tool-generated). Survives file moves; link targets may use it instead of the slug."
+    },
     "title": {
       "type": "string",
       "description": "Display name"

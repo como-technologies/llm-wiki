@@ -11,6 +11,11 @@
   "type": "object",
   "required": ["name", "description", "type"],
   "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "Stable opaque page identifier (ULID, tool-generated). Survives file moves; link targets may use it instead of the slug."
+    },
     "name": {
       "type": "string",
       "description": "Skill identifier (lowercase, hyphenated, max 64 chars)",

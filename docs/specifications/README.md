@@ -18,6 +18,7 @@ Data model and knowledge structure.
 | ---------------------------------------------------------------- | -------------------------------------------------------------- |
 | [wiki-repository-layout.md](model/wiki-repository-layout.md)    | Wiki repo structure, content layers, roots                     |
 | [page-content.md](model/page-content.md)                        | Page format, flat vs bundle, slug resolution, body conventions |
+| [page-identity.md](model/page-identity.md)                      | Stable page ids (ULID) — declaration, resolution order, uniqueness |
 | [epistemic-model.md](model/epistemic-model.md)                  | Why types carry epistemic distinctions                         |
 | [wiki-toml.md](model/wiki-toml.md)                              | wiki.toml reference — identity, type registry, per-wiki settings |
 | [global-config.md](model/global-config.md)                      | config.toml reference — space registry, defaults, global-only settings |
