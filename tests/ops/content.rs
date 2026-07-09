@@ -67,6 +67,7 @@ fn content_new_page() {
         false,
         None,
         None,
+        None,
     )
     .unwrap();
     assert!(result.uri.starts_with("wiki://test/concepts/new-concept"));
@@ -83,7 +84,7 @@ fn content_new_section() {
     let manager = WikiEngine::build(&config_path).unwrap();
     let engine = manager.state.read().unwrap();
 
-    let result = ops::content_new(&engine, "topics", None, true, false, None, None).unwrap();
+    let result = ops::content_new(&engine, "topics", None, true, false, None, None, None).unwrap();
     assert!(result.uri.contains("topics"));
 }
 
@@ -94,8 +95,17 @@ fn content_new_bundle_result_has_path_and_wiki_root() {
     let manager = WikiEngine::build(&config_path).unwrap();
     let engine = manager.state.read().unwrap();
 
-    let result =
-        ops::content_new(&engine, "concepts/bundled", None, false, true, None, None).unwrap();
+    let result = ops::content_new(
+        &engine,
+        "concepts/bundled",
+        None,
+        false,
+        true,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
     assert!(result.bundle);
     assert!(result.path.ends_with("index.md"));
     assert!(result.path.exists());
@@ -288,6 +298,45 @@ fn backlinks_include_pages_linking_by_id() {
         refs.iter().any(|r| r.slug == "concepts/id-linker"),
         "id-based link must appear in the target's backlinks: {refs:?}"
     );
+}
+
+#[test]
+fn content_new_with_explicit_id_writes_frontmatter() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = setup_wiki(dir.path(), "test");
+    let manager = WikiEngine::build(&config_path).unwrap();
+    let engine = manager.state.read().unwrap();
+
+    let id = ulid::Ulid::from_string(STABLE_ID).unwrap();
+    let result = ops::content_new(
+        &engine,
+        "concepts/with-id",
+        None,
+        false,
+        false,
+        None,
+        None,
+        Some(id),
+    )
+    .unwrap();
+    assert_eq!(result.id, Some(id));
+
+    let content = std::fs::read_to_string(&result.path).unwrap();
+    let page = llm_wiki::frontmatter::parse(&content);
+    assert_eq!(page.id(), Some(id));
+}
+
+#[test]
+fn content_new_rejects_id_on_section() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = setup_wiki(dir.path(), "test");
+    let manager = WikiEngine::build(&config_path).unwrap();
+    let engine = manager.state.read().unwrap();
+
+    let id = ulid::Ulid::from_string(STABLE_ID).unwrap();
+    let err =
+        ops::content_new(&engine, "topics", None, true, false, None, None, Some(id)).unwrap_err();
+    assert!(err.to_string().contains("section"));
 }
 
 #[test]

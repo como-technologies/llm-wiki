@@ -367,6 +367,10 @@ pub enum ContentAction {
         /// Page type (default: page)
         #[arg(long, name = "type")]
         r#type: Option<String>,
+        /// Assign a stable page id — bare `--id` generates a ULID,
+        /// `--id <ULID>` uses the given one
+        #[arg(long, num_args = 0..=1, default_missing_value = "auto")]
+        id: Option<String>,
         /// Show what would be created without creating
         #[arg(long)]
         dry_run: bool,

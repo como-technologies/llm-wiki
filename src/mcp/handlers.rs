@@ -210,6 +210,13 @@ pub fn handle_content_new(server: &McpServer, args: &Map<String, Value>) -> Tool
     let bundle = arg_bool(args, "bundle");
     let name = arg_str(args, "name");
     let type_ = arg_str(args, "type");
+    let id = if arg_bool(args, "auto_id") {
+        Some(ulid::Ulid::new())
+    } else if let Some(s) = arg_str(args, "id") {
+        Some(ulid::Ulid::from_string(&s).map_err(|e| format!("invalid id (must be a ULID): {e}"))?)
+    } else {
+        None
+    };
 
     let engine = server.engine();
     let wiki_flag = arg_str(args, "wiki");
@@ -222,16 +229,20 @@ pub fn handle_content_new(server: &McpServer, args: &Map<String, Value>) -> Tool
         bundle,
         name.as_deref(),
         type_.as_deref(),
+        id,
     )
     .map_err(|e| format!("{e}"))?;
-    let s = serde_json::to_string_pretty(&serde_json::json!({
+    let mut response = serde_json::json!({
         "uri":       result.uri,
         "slug":      result.slug,
         "path":      result.path,
         "wiki_root": result.wiki_root,
         "bundle":    result.bundle,
-    }))
-    .map_err(|e| format!("{e}"))?;
+    });
+    if let Some(id) = result.id {
+        response["id"] = serde_json::json!(id.to_string());
+    }
+    let s = serde_json::to_string_pretty(&response).map_err(|e| format!("{e}"))?;
     ok_text(s)
 }
 
@@ -260,15 +271,25 @@ pub fn handle_resolve(server: &McpServer, args: &Map<String, Value>) -> ToolHand
         }
     };
 
-    let s = serde_json::to_string_pretty(&serde_json::json!({
+    let id = engine.space(&entry.name).ok().and_then(|space| {
+        let searcher = space.index_manager.searcher().ok()?;
+        crate::search::id_for_slug(&searcher, &space.index_schema, slug.as_str())
+            .ok()
+            .flatten()
+    });
+
+    let mut response = serde_json::json!({
         "slug":      slug.as_str(),
         "wiki":      entry.name,
         "wiki_root": wiki_root,
         "path":      path,
         "exists":    exists,
         "bundle":    bundle,
-    }))
-    .map_err(|e| format!("{e}"))?;
+    });
+    if let Some(id) = id {
+        response["id"] = serde_json::json!(id.to_string());
+    }
+    let s = serde_json::to_string_pretty(&response).map_err(|e| format!("{e}"))?;
     ok_text(s)
 }
 

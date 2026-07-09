@@ -163,7 +163,7 @@ fn create_page_flat() {
     let dir = tempfile::tempdir().unwrap();
     let wiki = setup_wiki(dir.path());
 
-    let path = create_page(&slug("concepts/bar"), false, &wiki, None, None, None).unwrap();
+    let path = create_page(&slug("concepts/bar"), false, &wiki, None, None, None, None).unwrap();
     assert_eq!(path, wiki.join("concepts/bar.md"));
     assert!(path.is_file());
 
@@ -178,7 +178,7 @@ fn create_page_bundle() {
     let dir = tempfile::tempdir().unwrap();
     let wiki = setup_wiki(dir.path());
 
-    let path = create_page(&slug("concepts/bar"), true, &wiki, None, None, None).unwrap();
+    let path = create_page(&slug("concepts/bar"), true, &wiki, None, None, None, None).unwrap();
     assert_eq!(path, wiki.join("concepts/bar/index.md"));
     assert!(path.is_file());
 }
@@ -193,6 +193,7 @@ fn create_page_with_name_override() {
         false,
         &wiki,
         Some("Custom Title"),
+        None,
         None,
         None,
     )
@@ -213,6 +214,7 @@ fn create_page_with_type_override() {
         None,
         Some("paper"),
         None,
+        None,
     )
     .unwrap();
     let page = frontmatter::parse(&fs::read_to_string(&path).unwrap());
@@ -224,7 +226,7 @@ fn create_page_auto_creates_parent_sections() {
     let dir = tempfile::tempdir().unwrap();
     let wiki = setup_wiki(dir.path());
 
-    create_page(&slug("a/b/c"), false, &wiki, None, None, None).unwrap();
+    create_page(&slug("a/b/c"), false, &wiki, None, None, None, None).unwrap();
 
     let a_index = wiki.join("a/index.md");
     assert!(a_index.is_file());

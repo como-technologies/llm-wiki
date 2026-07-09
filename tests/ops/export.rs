@@ -171,3 +171,46 @@ fn export_excludes_archived_by_default() {
     let content_all = std::fs::read_to_string(&report_all.path).unwrap();
     assert!(content_all.contains("archived-page"));
 }
+
+// ── stable page id ────────────────────────────────────────────────────────────
+
+#[test]
+fn export_json_includes_id_only_when_declared() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = setup_wiki(dir.path(), "test");
+    let wiki_root = dir.path().join("test").join("wiki");
+    std::fs::write(
+        wiki_root.join("concepts/identified.md"),
+        "---\ntitle: \"Identified\"\nid: 01ARZ3NDEKTSV4RRFFQ69G5FAV\ntype: concept\nstatus: active\n---\n\nBody.\n",
+    )
+    .unwrap();
+    llm_wiki::git::commit(&dir.path().join("test"), "add identified").unwrap();
+
+    let manager = WikiEngine::build(&config_path).unwrap();
+    let engine = manager.state.read().unwrap();
+
+    let report = ops::export(
+        &engine,
+        &ExportOptions {
+            wiki: "test".into(),
+            path: Some("llms.json".into()),
+            format: ExportFormat::Json,
+            include_archived: false,
+        },
+    )
+    .unwrap();
+
+    let json: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&report.path).unwrap()).unwrap();
+    let pages = json.as_array().unwrap();
+    let identified = pages
+        .iter()
+        .find(|p| p["slug"] == "concepts/identified")
+        .unwrap();
+    assert_eq!(identified["id"], "01ARZ3NDEKTSV4RRFFQ69G5FAV");
+    let moe = pages.iter().find(|p| p["slug"] == "concepts/moe").unwrap();
+    assert!(
+        moe.get("id").is_none(),
+        "id must be omitted when not declared"
+    );
+}

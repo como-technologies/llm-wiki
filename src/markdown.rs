@@ -92,6 +92,7 @@ pub fn create_page(
     wiki_root: &Path,
     name_override: Option<&str>,
     type_override: Option<&str>,
+    id: Option<ulid::Ulid>,
     body_template: Option<&str>,
 ) -> Result<PathBuf> {
     let slug_str = slug.as_str();
@@ -118,6 +119,9 @@ pub fn create_page(
     }
     if let Some(t) = type_override {
         fm.insert("type".into(), serde_yaml::Value::String(t.to_string()));
+    }
+    if let Some(id) = id {
+        fm.insert("id".into(), serde_yaml::Value::String(id.to_string()));
     }
     let body = body_template.unwrap_or("");
     let content = frontmatter::write(&fm, body);

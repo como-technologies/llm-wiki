@@ -216,3 +216,53 @@ fn list_facets_always_present() {
         "list facets should have status distribution"
     );
 }
+
+#[test]
+fn search_and_list_surface_page_id() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = setup_wiki(dir.path(), "test");
+    let wiki_root = dir.path().join("test").join("wiki");
+    fs::write(
+        wiki_root.join("concepts/identified.md"),
+        "---\ntitle: \"Identified Unicorn\"\nid: 01ARZ3NDEKTSV4RRFFQ69G5FAV\ntype: concept\nstatus: active\n---\n\nBody.\n",
+    )
+    .unwrap();
+    git::commit(&dir.path().join("test"), "add identified").unwrap();
+
+    let manager = WikiEngine::build(&config_path).unwrap();
+    let engine = manager.state.read().unwrap();
+
+    let results = ops::search(
+        &engine,
+        "test",
+        &ops::SearchParams {
+            query: "unicorn",
+            type_filter: None,
+            no_excerpt: true,
+            top_k: None,
+            include_sections: false,
+            cross_wiki: false,
+        },
+    )
+    .unwrap();
+    let hit = results
+        .results
+        .iter()
+        .find(|r| r.slug == "concepts/identified")
+        .expect("page should be found");
+    assert_eq!(
+        hit.id.map(|u| u.to_string()).as_deref(),
+        Some("01ARZ3NDEKTSV4RRFFQ69G5FAV")
+    );
+
+    // Pages without an id serialize without the field
+    let json = serde_json::to_value(&results.results).unwrap();
+    for r in json.as_array().unwrap() {
+        if r["slug"] == "concepts/moe" {
+            assert!(
+                r.get("id").is_none(),
+                "id must be omitted from JSON when absent"
+            );
+        }
+    }
+}

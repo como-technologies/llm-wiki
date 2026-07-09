@@ -157,11 +157,14 @@ pub fn content_write(
 }
 
 /// Result of creating a new wiki page or section.
+#[derive(Debug)]
 pub struct ContentNewResult {
     /// `wiki://` URI for the created page.
     pub uri: String,
     /// Slug of the created page.
     pub slug: String,
+    /// Stable page id written to frontmatter, if one was assigned.
+    pub id: Option<ulid::Ulid>,
     /// Absolute filesystem path of the created file.
     pub path: PathBuf,
     /// Absolute path to the wiki root directory.
@@ -171,6 +174,7 @@ pub struct ContentNewResult {
 }
 
 /// Create a new wiki page or section with scaffolded frontmatter.
+#[allow(clippy::too_many_arguments)]
 pub fn content_new(
     engine: &EngineState,
     uri: &str,
@@ -179,10 +183,15 @@ pub fn content_new(
     bundle: bool,
     name: Option<&str>,
     type_: Option<&str>,
+    id: Option<ulid::Ulid>,
 ) -> Result<ContentNewResult> {
     let (entry, slug) = WikiUri::resolve(uri, wiki_flag, &engine.config)?;
     let repo_root = PathBuf::from(&entry.path);
     let wiki_root = engine.space(&entry.name)?.wiki_root.clone();
+
+    if section && id.is_some() {
+        bail!("sections do not carry a page id");
+    }
 
     let type_name = if section {
         "section"
@@ -200,6 +209,7 @@ pub fn content_new(
             &wiki_root,
             name,
             type_,
+            id,
             body_template.as_deref(),
         )?
     };
@@ -207,6 +217,7 @@ pub fn content_new(
     Ok(ContentNewResult {
         uri: format!("wiki://{}/{slug}", entry.name),
         slug: slug.as_str().to_string(),
+        id,
         path,
         wiki_root,
         bundle,

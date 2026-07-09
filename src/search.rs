@@ -24,6 +24,9 @@ pub struct PageRef {
     pub slug: String,
     /// Fully-qualified `wiki://` URI for the page.
     pub uri: String,
+    /// Stable page id from frontmatter, if declared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<Ulid>,
     /// Page title from frontmatter.
     pub title: String,
     /// Adjusted BM25 score (multiplied by status and confidence).
@@ -44,6 +47,9 @@ pub struct PageSummary {
     pub slug: String,
     /// Fully-qualified `wiki://` URI.
     pub uri: String,
+    /// Stable page id from frontmatter, if declared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<Ulid>,
     /// Page title from frontmatter.
     pub title: String,
     /// Page type from frontmatter.
@@ -227,6 +233,7 @@ pub fn search(
     let f_summary = is.try_field("summary");
     let f_body = is.field("body");
     let f_type = is.field("type");
+    let f_id = is.field("id");
 
     let index = searcher.index();
     let mut query_fields = vec![f_title, f_body];
@@ -340,9 +347,15 @@ pub fn search(
             .filter(|s| !s.is_empty())
             .map(|s| s.to_string());
 
+        let id = doc
+            .get_first(f_id)
+            .and_then(|v| v.as_str())
+            .and_then(|s| Ulid::from_string(s).ok());
+
         results.push(PageRef {
             slug,
             uri,
+            id,
             title,
             score,
             confidence,
@@ -401,6 +414,7 @@ pub fn list(
     let f_tags = is.field("tags");
     let f_confidence = is.try_field("confidence");
     let f_summary = is.try_field("summary");
+    let f_id = is.field("id");
 
     let query: Box<dyn tantivy::query::Query> = {
         let mut clauses: Vec<(Occur, Box<dyn tantivy::query::Query>)> = Vec::new();
@@ -521,9 +535,15 @@ pub fn list(
 
         let uri = format!("wiki://{wiki_name}/{slug}");
 
+        let id = doc
+            .get_first(f_id)
+            .and_then(|v| v.as_str())
+            .and_then(|s| Ulid::from_string(s).ok());
+
         summaries.push(PageSummary {
             slug,
             uri,
+            id,
             title,
             r#type: page_type,
             status,

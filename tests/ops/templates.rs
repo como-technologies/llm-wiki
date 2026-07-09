@@ -20,6 +20,7 @@ fn content_new_concept_has_body_template() {
         false,
         None,
         Some("concept"),
+        None,
     )
     .unwrap();
 
@@ -42,7 +43,7 @@ fn content_new_section_has_body_template() {
     let manager = WikiEngine::build(&config_path).unwrap();
     let engine = manager.state.read().unwrap();
 
-    ops::content_new(&engine, "topics", None, true, false, None, None).unwrap();
+    ops::content_new(&engine, "topics", None, true, false, None, None, None).unwrap();
 
     let space = engine.space("test").unwrap();
     let content = fs::read_to_string(space.wiki_root.join("topics/index.md")).unwrap();
@@ -76,6 +77,7 @@ fn custom_template_overrides_embedded() {
         false,
         None,
         Some("concept"),
+        None,
     )
     .unwrap();
 
@@ -107,6 +109,7 @@ fn missing_template_falls_back_to_empty_body() {
         false,
         None,
         Some("skill"),
+        None,
     )
     .unwrap();
 

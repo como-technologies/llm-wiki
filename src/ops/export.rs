@@ -74,6 +74,8 @@ pub struct ExportReport {
 struct PageEntry {
     slug: String,
     uri: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    id: Option<ulid::Ulid>,
     title: String,
     r#type: String,
     status: String,
@@ -153,6 +155,7 @@ fn collect_pages(
     let f_status = is.field("status");
     let f_confidence = is.try_field("confidence");
     let f_summary = is.try_field("summary");
+    let f_id = is.field("id");
 
     let top_docs = searcher.search(&AllQuery, &TopDocs::with_limit(100_000).order_by_score())?;
 
@@ -202,9 +205,15 @@ fn collect_pages(
 
         let uri = format!("wiki://{wiki_name}/{slug}");
 
+        let id = doc
+            .get_first(f_id)
+            .and_then(|v| v.as_str())
+            .and_then(|s| ulid::Ulid::from_string(s).ok());
+
         pages.push(PageEntry {
             slug,
             uri,
+            id,
             title,
             r#type: page_type,
             status,

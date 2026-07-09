@@ -152,6 +152,8 @@ pub fn tool_list() -> Vec<Tool> {
                     "bundle": opt_bool("Create as bundle (folder + index.md)"),
                     "name": opt_str("Page title (default: derived from slug)"),
                     "type": opt_str("Page type (default: page)"),
+                    "id": opt_str("Stable page id to assign (must be a ULID)"),
+                    "auto_id": opt_bool("Generate a stable page id (ULID)"),
                     "wiki": opt_str("Target wiki name"),
                 }),
                 &["uri"],

@@ -203,8 +203,17 @@ fn main() -> Result<()> {
                 bundle,
                 name,
                 r#type,
+                id,
                 dry_run,
             } => {
+                let id =
+                    match id.as_deref() {
+                        Some("auto") => Some(ulid::Ulid::new()),
+                        Some(s) => Some(ulid::Ulid::from_string(s).map_err(|e| {
+                            anyhow::anyhow!("invalid --id (must be a ULID): {s}: {e}")
+                        })?),
+                        None => None,
+                    };
                 if dry_run {
                     let manager = WikiEngine::build(&config_path)?;
                     let engine = manager.state.read().map_err(|_| anyhow::anyhow!("lock"))?;
@@ -230,8 +239,12 @@ fn main() -> Result<()> {
                         bundle,
                         name.as_deref(),
                         r#type.as_deref(),
+                        id,
                     )?;
-                    println!("Created: {}", result.uri);
+                    match result.id {
+                        Some(id) => println!("Created: {} (id: {id})", result.uri),
+                        None => println!("Created: {}", result.uri),
+                    }
                 }
             }
             ContentAction::Commit {
