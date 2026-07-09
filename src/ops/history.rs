@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::engine::EngineState;
 use crate::git;
-use crate::slug::{Slug, WikiUri};
 
 /// Git history for a single page — slug and log entries.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,14 +21,8 @@ pub fn history(
     limit: Option<usize>,
     follow: Option<bool>,
 ) -> Result<HistoryResult> {
-    let (wiki_name, slug) = if slug_or_uri.starts_with("wiki://") {
-        let (entry, slug) = WikiUri::resolve(slug_or_uri, wiki_flag, &engine.config)?;
-        (entry.name, slug)
-    } else {
-        let wiki_name = engine.resolve_wiki_name(wiki_flag).to_string();
-        let slug = Slug::try_from(slug_or_uri)?;
-        (wiki_name, slug)
-    };
+    let (entry, slug) = engine.resolve_address(slug_or_uri, wiki_flag)?;
+    let wiki_name = entry.name;
 
     let space = engine.space(&wiki_name)?;
     let resolved = space.resolved_config(&engine.config);

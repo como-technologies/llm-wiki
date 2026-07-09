@@ -5,11 +5,12 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use tantivy::{
     DocId, Order, Score, Searcher, Term,
-    collector::{Count, TopDocs},
+    collector::{Count, DocSetCollector, TopDocs},
     query::{AllQuery, BooleanQuery, Occur, QueryParser, TermQuery},
     schema::{IndexRecordOption, Value},
     snippet::{Snippet, SnippetGenerator},
 };
+use ulid::Ulid;
 
 use crate::config::SearchConfig;
 use crate::index_schema::IndexSchema;
@@ -161,6 +162,54 @@ impl Default for ListOptions {
             facets_top_tags: 10,
         }
     }
+}
+
+// ── Stable page id lookups ────────────────────────────────────────────────────
+
+/// Resolve a stable page id to its slug via the index.
+///
+/// Under duplicate ids (a lint error) the lexicographically smallest slug
+/// wins, so resolution stays deterministic.
+pub fn slug_for_id(searcher: &Searcher, is: &IndexSchema, id: Ulid) -> Result<Option<String>> {
+    let term = Term::from_field_text(is.field("id"), &id.to_string());
+    let query = TermQuery::new(term, IndexRecordOption::Basic);
+    let addrs = searcher.search(&query, &DocSetCollector)?;
+
+    let f_slug = is.field("slug");
+    let mut slugs: Vec<String> = addrs
+        .into_iter()
+        .filter_map(|addr| {
+            let doc: tantivy::TantivyDocument = searcher.doc(addr).ok()?;
+            doc.get_first(f_slug)
+                .and_then(|v| v.as_str())
+                .map(str::to_string)
+        })
+        .collect();
+    slugs.sort();
+    Ok(slugs.into_iter().next())
+}
+
+/// Return the stable id declared by the page at `slug`, if any.
+///
+/// A stored id that is not a valid ULID (reported by the `id-format`
+/// lint rule) is treated as absent.
+pub fn id_for_slug(searcher: &Searcher, is: &IndexSchema, slug: &str) -> Result<Option<Ulid>> {
+    let term = Term::from_field_text(is.field("slug"), slug);
+    let query = TermQuery::new(term, IndexRecordOption::Basic);
+    let addrs = searcher.search(&query, &DocSetCollector)?;
+
+    let f_id = is.field("id");
+    for addr in addrs {
+        let doc: tantivy::TantivyDocument = searcher.doc(addr)?;
+        if let Some(id) = doc
+            .get_first(f_id)
+            .and_then(|v| v.as_str())
+            .and_then(|s| Ulid::from_string(s).ok())
+        {
+            return Ok(Some(id));
+        }
+    }
+    Ok(None)
 }
 
 // ── search ────────────────────────────────────────────────────────────────────

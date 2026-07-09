@@ -7,7 +7,6 @@ use tantivy::schema::Value;
 use crate::engine::EngineState;
 use crate::graph::{GraphFilter, get_cached_community_map, get_or_build_graph};
 use crate::search;
-use crate::slug::{Slug, WikiUri};
 
 /// A page suggested as a related link for a given slug.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,14 +34,8 @@ pub fn suggest(
     wiki_flag: Option<&str>,
     limit: Option<usize>,
 ) -> Result<Vec<Suggestion>> {
-    let (wiki_name, slug) = if slug_or_uri.starts_with("wiki://") {
-        let (entry, slug) = WikiUri::resolve(slug_or_uri, wiki_flag, &engine.config)?;
-        (entry.name, slug)
-    } else {
-        let wiki_name = engine.resolve_wiki_name(wiki_flag).to_string();
-        let slug = Slug::try_from(slug_or_uri)?;
-        (wiki_name, slug)
-    };
+    let (entry, slug) = engine.resolve_address(slug_or_uri, wiki_flag)?;
+    let wiki_name = entry.name;
 
     let space = engine.space(&wiki_name)?;
     let resolved = space.resolved_config(&engine.config);

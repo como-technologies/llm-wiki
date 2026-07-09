@@ -102,6 +102,189 @@ fn content_new_bundle_result_has_path_and_wiki_root() {
     assert!(result.wiki_root.is_dir());
 }
 
+// ── Stable page id resolution ─────────────────────────────────────────────────
+
+const STABLE_ID: &str = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+
+/// setup_wiki plus a page that declares a stable id.
+fn setup_wiki_with_id(dir: &std::path::Path, name: &str) -> std::path::PathBuf {
+    let config_path = setup_wiki(dir, name);
+    let wiki_root = dir.join(name).join("wiki");
+    std::fs::write(
+        wiki_root.join("concepts/stable.md"),
+        format!(
+            "---\ntitle: \"Stable\"\nid: {STABLE_ID}\ntype: concept\nstatus: active\n---\n\nStable page body.\n"
+        ),
+    )
+    .unwrap();
+    llm_wiki::git::commit(&dir.join(name), "add stable page").unwrap();
+    config_path
+}
+
+#[test]
+fn content_read_by_bare_id() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = setup_wiki_with_id(dir.path(), "test");
+    let manager = WikiEngine::build(&config_path).unwrap();
+    let engine = manager.state.read().unwrap();
+
+    match ops::content_read(&engine, STABLE_ID, None, false, false).unwrap() {
+        ops::ContentReadResult::Page(content) => {
+            assert!(content.contains("Stable page body"));
+        }
+        _ => panic!("expected Page"),
+    }
+}
+
+#[test]
+fn content_read_by_wiki_uri_id() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = setup_wiki_with_id(dir.path(), "test");
+    let manager = WikiEngine::build(&config_path).unwrap();
+    let engine = manager.state.read().unwrap();
+
+    let uri = format!("wiki://test/{STABLE_ID}");
+    match ops::content_read(&engine, &uri, None, false, false).unwrap() {
+        ops::ContentReadResult::Page(content) => {
+            assert!(content.contains("Stable page body"));
+        }
+        _ => panic!("expected Page"),
+    }
+}
+
+#[test]
+fn content_read_by_id_lowercase_input() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = setup_wiki_with_id(dir.path(), "test");
+    let manager = WikiEngine::build(&config_path).unwrap();
+    let engine = manager.state.read().unwrap();
+
+    let lower = STABLE_ID.to_lowercase();
+    match ops::content_read(&engine, &lower, None, false, false).unwrap() {
+        ops::ContentReadResult::Page(content) => {
+            assert!(content.contains("Stable page body"));
+        }
+        _ => panic!("expected Page"),
+    }
+}
+
+#[test]
+fn id_resolution_survives_file_move() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = setup_wiki_with_id(dir.path(), "test");
+    let manager = WikiEngine::build(&config_path).unwrap();
+
+    // Move the page to a different directory and name, then re-index.
+    let wiki_root = dir.path().join("test").join("wiki");
+    std::fs::create_dir_all(wiki_root.join("guides")).unwrap();
+    std::fs::rename(
+        wiki_root.join("concepts/stable.md"),
+        wiki_root.join("guides/stable-renamed.md"),
+    )
+    .unwrap();
+    llm_wiki::git::commit(&dir.path().join("test"), "move stable page").unwrap();
+    manager.refresh_index("test").unwrap();
+
+    let engine = manager.state.read().unwrap();
+    match ops::content_read(&engine, STABLE_ID, None, false, false).unwrap() {
+        ops::ContentReadResult::Page(content) => {
+            assert!(
+                content.contains("Stable page body"),
+                "id must resolve to the moved page"
+            );
+        }
+        _ => panic!("expected Page"),
+    }
+}
+
+#[test]
+fn slug_wins_over_id_with_same_spelling() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = setup_wiki(dir.path(), "test");
+    let wiki_root = dir.path().join("test").join("wiki");
+
+    // A page whose slug is spelled exactly like a ULID...
+    std::fs::write(
+        wiki_root.join(format!("{STABLE_ID}.md")),
+        "---\ntitle: \"Slug Page\"\ntype: page\nstatus: active\n---\n\nI am the slug page.\n",
+    )
+    .unwrap();
+    // ...and a different page declaring that spelling as its id.
+    std::fs::write(
+        wiki_root.join("concepts/claimant.md"),
+        format!(
+            "---\ntitle: \"Claimant\"\nid: {STABLE_ID}\ntype: concept\nstatus: active\n---\n\nI am the id page.\n"
+        ),
+    )
+    .unwrap();
+    llm_wiki::git::commit(&dir.path().join("test"), "add pages").unwrap();
+
+    let manager = WikiEngine::build(&config_path).unwrap();
+    let engine = manager.state.read().unwrap();
+
+    match ops::content_read(&engine, STABLE_ID, None, false, false).unwrap() {
+        ops::ContentReadResult::Page(content) => {
+            assert!(
+                content.contains("I am the slug page"),
+                "an on-disk slug must shadow an id with the same spelling"
+            );
+        }
+        _ => panic!("expected Page"),
+    }
+}
+
+#[test]
+fn id_pointing_at_missing_file_reports_stale_index() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = setup_wiki_with_id(dir.path(), "test");
+    let manager = WikiEngine::build(&config_path).unwrap();
+
+    // Delete the file without re-indexing — the index still maps the id.
+    let wiki_root = dir.path().join("test").join("wiki");
+    std::fs::remove_file(wiki_root.join("concepts/stable.md")).unwrap();
+
+    let engine = manager.state.read().unwrap();
+    let err = ops::content_read(&engine, STABLE_ID, None, false, false).unwrap_err();
+    assert!(
+        err.to_string().contains("stale"),
+        "expected stale-index error, got: {err}"
+    );
+}
+
+#[test]
+fn unknown_id_reports_page_not_found() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = setup_wiki_with_id(dir.path(), "test");
+    let manager = WikiEngine::build(&config_path).unwrap();
+    let engine = manager.state.read().unwrap();
+
+    let err =
+        ops::content_read(&engine, "01BX5ZZKBKACTAV9WEVGEMMVRZ", None, false, false).unwrap_err();
+    assert!(
+        err.to_string().contains("not found"),
+        "expected page-not-found error, got: {err}"
+    );
+}
+
+#[test]
+fn content_write_by_id_edits_declaring_page() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = setup_wiki_with_id(dir.path(), "test");
+    let manager = WikiEngine::build(&config_path).unwrap();
+    let engine = manager.state.read().unwrap();
+
+    let body = format!(
+        "---\ntitle: \"Stable\"\nid: {STABLE_ID}\ntype: concept\nstatus: active\n---\n\nRewritten body.\n"
+    );
+    let result = ops::content_write(&engine, STABLE_ID, None, &body).unwrap();
+    assert!(result.path.ends_with("concepts/stable.md"));
+
+    match ops::content_read(&engine, "concepts/stable", None, false, false).unwrap() {
+        ops::ContentReadResult::Page(content) => assert!(content.contains("Rewritten body")),
+        _ => panic!("expected Page"),
+    }
+}
+
 #[test]
 fn content_commit_all() {
     let dir = tempfile::tempdir().unwrap();

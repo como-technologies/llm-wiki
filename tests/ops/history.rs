@@ -95,6 +95,28 @@ fn history_via_wiki_uri() {
     assert!(!result.entries.is_empty());
 }
 
+#[test]
+fn history_via_stable_id() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = setup_wiki(dir.path(), "test");
+
+    let wiki_path = dir.path().join("test");
+    let wiki_root = wiki_path.join("wiki");
+    fs::write(
+        wiki_root.join("concepts/tracked.md"),
+        "---\ntitle: \"Tracked\"\nid: 01ARZ3NDEKTSV4RRFFQ69G5FAV\ntype: concept\nstatus: active\n---\n\nBody.\n",
+    )
+    .unwrap();
+    git::commit(&wiki_path, "add tracked page").unwrap();
+
+    let manager = WikiEngine::build(&config_path).unwrap();
+    let engine = manager.state.read().unwrap();
+
+    let result = ops::history(&engine, "01ARZ3NDEKTSV4RRFFQ69G5FAV", None, None, None).unwrap();
+    assert_eq!(result.slug, "concepts/tracked");
+    assert!(!result.entries.is_empty());
+}
+
 // ── Git-level history ─────────────────────────────────────────────────────────
 
 #[test]

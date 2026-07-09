@@ -2,7 +2,7 @@ use rmcp::model::Content;
 use serde_json::{Map, Value};
 
 use crate::ops;
-use crate::slug::{ReadTarget, WikiUri, resolve_read_target};
+use crate::slug::{ReadTarget, resolve_read_target};
 
 use super::McpServer;
 use super::helpers::*;
@@ -165,10 +165,10 @@ pub fn handle_content_read(server: &McpServer, args: &Map<String, Value>) -> Too
     {
         ops::ContentReadResult::Page(content) => {
             if include_backlinks {
-                let wiki_name = engine.resolve_wiki_name(wiki_flag.as_deref()).to_string();
-                let (_entry, slug) = WikiUri::resolve(&uri, wiki_flag.as_deref(), &engine.config)
+                let (entry, slug) = engine
+                    .resolve_address(&uri, wiki_flag.as_deref())
                     .map_err(|e| format!("{e}"))?;
-                let backlinks = ops::backlinks_for(&engine, &wiki_name, slug.as_str())
+                let backlinks = ops::backlinks_for(&engine, &entry.name, slug.as_str())
                     .map_err(|e| format!("{e}"))?;
                 let response = serde_json::json!({
                     "content": content,
@@ -241,8 +241,9 @@ pub fn handle_resolve(server: &McpServer, args: &Map<String, Value>) -> ToolHand
     let engine = server.engine();
     let wiki_flag = arg_str(args, "wiki");
 
-    let (entry, slug) =
-        WikiUri::resolve(&uri, wiki_flag.as_deref(), &engine.config).map_err(|e| format!("{e}"))?;
+    let (entry, slug) = engine
+        .resolve_address(&uri, wiki_flag.as_deref())
+        .map_err(|e| format!("{e}"))?;
     let wiki_root = engine
         .space(&entry.name)
         .map(|s| s.wiki_root.clone())

@@ -77,6 +77,7 @@ pub fn backlinks_for(
 }
 
 /// Result of a content read — page text, asset list, or binary asset.
+#[derive(Debug)]
 pub enum ContentReadResult {
     /// Page markdown content (possibly with frontmatter stripped).
     Page(String),
@@ -94,7 +95,7 @@ pub fn content_read(
     no_frontmatter: bool,
     list_assets: bool,
 ) -> Result<ContentReadResult> {
-    let (entry, slug) = WikiUri::resolve(uri, wiki_flag, &engine.config)?;
+    let (entry, slug) = engine.resolve_address(uri, wiki_flag)?;
     let wiki_root = engine.space(&entry.name)?.wiki_root.clone();
 
     if list_assets {
@@ -136,7 +137,7 @@ pub fn content_write(
     wiki_flag: Option<&str>,
     content: &str,
 ) -> Result<WriteResult> {
-    let (_entry, slug) = WikiUri::resolve(uri, wiki_flag, &engine.config)?;
+    let (_entry, slug) = engine.resolve_address(uri, wiki_flag)?;
     let wiki_root = engine.space(&_entry.name)?.wiki_root.clone();
     let path = markdown::write_page(slug.as_str(), content, &wiki_root)?;
     Ok(WriteResult {

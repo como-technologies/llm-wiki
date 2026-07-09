@@ -8,10 +8,14 @@ use petgraph_live::cache::GenerationCache;
 use petgraph_live::live::{GraphState, GraphStateConfig};
 use petgraph_live::snapshot::{Compression, SnapshotConfig, SnapshotFormat};
 
+use ulid::Ulid;
+
 use crate::config::{self, GlobalConfig, ResolvedConfig, WikiEntry};
 use crate::graph::{CommunityData, WikiGraph, WikiGraphCache};
 use crate::index_manager::{IndexReport, SpaceIndexManager, StalenessKind, UpdateReport};
 use crate::index_schema::IndexSchema;
+use crate::search;
+use crate::slug::{Slug, WikiUri};
 use crate::space_builder;
 use crate::type_registry::SpaceTypeRegistry;
 
@@ -80,6 +84,50 @@ impl EngineState {
     /// Return the index directory path for a wiki by name.
     pub fn index_path_for(&self, wiki_name: &str) -> PathBuf {
         self.state_dir.join("indexes").join(wiki_name)
+    }
+
+    /// Resolve a page address — slug, stable id, or `wiki://` URI — to
+    /// `(WikiEntry, Slug)`.
+    ///
+    /// Resolution order:
+    /// 1. **Exact slug match** — the address resolves to a file on disk.
+    ///    A slug always wins over an id with the same spelling, so slug
+    ///    addresses behave exactly as before.
+    /// 2. **Stable id lookup** — if the token parses as a ULID, the index
+    ///    maps it to the declaring page's slug, verified against disk.
+    ///
+    /// Anything else returns the parsed pair unchanged, so callers report
+    /// "page not found" exactly as they do today.
+    pub fn resolve_address(
+        &self,
+        input: &str,
+        wiki_flag: Option<&str>,
+    ) -> Result<(WikiEntry, Slug)> {
+        let (entry, slug) = WikiUri::resolve(input, wiki_flag, &self.config)?;
+        let Ok(space) = self.space(&entry.name) else {
+            return Ok((entry, slug));
+        };
+
+        if slug.resolve(&space.wiki_root).is_ok() {
+            return Ok((entry, slug));
+        }
+
+        if let Ok(id) = Ulid::from_string(slug.as_str())
+            && let Ok(searcher) = space.index_manager.searcher()
+            && let Some(mapped) = search::slug_for_id(&searcher, &space.index_schema, id)?
+        {
+            let mapped_slug = Slug::try_from(mapped.as_str())?;
+            if mapped_slug.resolve(&space.wiki_root).is_err() {
+                anyhow::bail!(
+                    "page id {id} maps to \"{mapped}\" in the index but the file is missing \
+                     — the index may be stale, run: llm-wiki index rebuild --wiki {}",
+                    entry.name,
+                );
+            }
+            return Ok((entry, mapped_slug));
+        }
+
+        Ok((entry, slug))
     }
 }
 

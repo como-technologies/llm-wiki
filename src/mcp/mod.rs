@@ -20,7 +20,7 @@ use rmcp::service::{RequestContext, RoleServer};
 
 use crate::engine::{EngineState, WikiEngine};
 use crate::markdown;
-use crate::slug::{Slug, WikiUri};
+use crate::slug::Slug;
 
 // ── McpServer ─────────────────────────────────────────────────────────────────
 
@@ -167,7 +167,7 @@ impl ServerHandler for McpServer {
                     )));
                 }
             };
-            match WikiUri::resolve(uri, None, &engine.config) {
+            match engine.resolve_address(uri, None) {
                 Ok((entry, slug)) => {
                     let wiki_root = engine
                         .space(&entry.name)
