@@ -304,7 +304,7 @@ pub fn tool_list() -> Vec<Tool> {
             "Run deterministic lint rules on the wiki index",
             schema(
                 json!({
-                    "rules": opt_str("Comma-separated rule names: orphan, broken-link, broken-cross-wiki-link, missing-fields, stale, unknown-type, articulation-point, bridge, periphery (omit for all)"),
+                    "rules": opt_str("Comma-separated rule names: orphan, broken-link, broken-cross-wiki-link, missing-fields, stale, unknown-type, duplicate-id, id-format, articulation-point, bridge, periphery (omit for all)"),
                     "severity": opt_str("Filter output: error | warning (omit for all)"),
                     "wiki": opt_str("Target wiki name"),
                 }),

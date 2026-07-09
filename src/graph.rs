@@ -11,6 +11,7 @@ use tantivy::Searcher;
 use tantivy::collector::TopDocs;
 use tantivy::query::AllQuery;
 use tantivy::schema::Value;
+use ulid::Ulid;
 
 use petgraph_live::cache::GenerationCache;
 use petgraph_live::live::GraphState;
@@ -31,6 +32,9 @@ pub struct PageNode {
     pub title: String,
     /// Frontmatter type of the page.
     pub r#type: String,
+    /// Stable page id from frontmatter, if declared.
+    #[serde(default)]
+    pub id: Option<Ulid>,
     /// True for cross-wiki placeholder nodes not present in the local index.
     #[serde(default)]
     pub external: bool,
@@ -323,12 +327,14 @@ pub fn build_graph(
     let f_slug = is.field("slug");
     let f_title = is.field("title");
     let f_type = is.field("type");
+    let f_id = is.field("id");
     let f_body_links = is.field("body_links");
 
     let top_docs = searcher.search(&AllQuery, &TopDocs::with_limit(100_000).order_by_score())?;
 
     let mut graph = WikiGraph::new();
     let mut slug_to_idx: HashMap<String, NodeIndex> = HashMap::new();
+    let mut id_to_idx: HashMap<String, NodeIndex> = HashMap::new();
 
     struct DocInfo {
         slug: String,
@@ -362,14 +368,23 @@ pub fn build_graph(
             continue;
         }
 
+        let id = doc
+            .get_first(f_id)
+            .and_then(|v| v.as_str())
+            .and_then(|s| Ulid::from_string(s).ok());
+
         let node = PageNode {
             slug: slug.clone(),
             title,
             r#type: page_type.clone(),
+            id,
             external: false,
         };
         let idx = graph.add_node(node);
         slug_to_idx.insert(slug.clone(), idx);
+        if let Some(id) = id {
+            id_to_idx.entry(id.to_string()).or_insert(idx);
+        }
 
         // Read body wiki-links
         let body_links: Vec<String> = doc
@@ -420,7 +435,7 @@ pub fn build_graph(
             }
 
             for target in targets {
-                let to_idx = resolve_or_external(target, &mut graph, &mut slug_to_idx);
+                let to_idx = resolve_or_external(target, &mut graph, &mut slug_to_idx, &id_to_idx);
                 if let Some(to_idx) = to_idx
                     && from_idx != to_idx
                 {
@@ -438,7 +453,7 @@ pub fn build_graph(
         // Body wiki-links → "links-to"
         if filter.relation.is_none() || filter.relation.as_deref() == Some("links-to") {
             for target in &doc_info.body_links {
-                let to_idx = resolve_or_external(target, &mut graph, &mut slug_to_idx);
+                let to_idx = resolve_or_external(target, &mut graph, &mut slug_to_idx, &id_to_idx);
                 if let Some(to_idx) = to_idx
                     && from_idx != to_idx
                 {
@@ -464,13 +479,14 @@ pub fn build_graph(
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-/// Resolve a target slug to a node index. If the target is a `wiki://` URI,
-/// insert an external placeholder node on demand. Returns `None` only for
-/// plain local slugs that don't exist in the index.
+/// Resolve a target — slug or stable id — to a node index. If the target is
+/// a `wiki://` URI, insert an external placeholder node on demand. Returns
+/// `None` only for plain local targets that don't exist in the index.
 fn resolve_or_external(
     target: &str,
     graph: &mut WikiGraph,
     slug_to_idx: &mut HashMap<String, NodeIndex>,
+    id_to_idx: &HashMap<String, NodeIndex>,
 ) -> Option<NodeIndex> {
     if target.starts_with("wiki://") {
         let key = target.to_string();
@@ -483,12 +499,18 @@ fn resolve_or_external(
                 slug: slug.clone(),
                 title: key.clone(),
                 r#type: "external".to_string(),
+                id: None,
                 external: true,
             })
         });
         Some(idx)
+    } else if let Some(idx) = slug_to_idx.get(target) {
+        // Slug match wins over an id with the same spelling
+        Some(*idx)
     } else {
-        slug_to_idx.get(target).copied()
+        Ulid::from_string(target)
+            .ok()
+            .and_then(|id| id_to_idx.get(&id.to_string()).copied())
     }
 }
 
@@ -519,6 +541,7 @@ pub fn build_graph_cross_wiki(
                 slug: key.clone(),
                 title: node.title.clone(),
                 r#type: node.r#type.clone(),
+                id: node.id,
                 external: false,
             });
             global_idx.insert(key, new_idx);
@@ -560,6 +583,7 @@ pub fn build_graph_cross_wiki(
                             slug: to_key.clone(),
                             title: to_node.title.clone(),
                             r#type: "external".to_string(),
+                            id: None,
                             external: true,
                         })
                     })
@@ -621,6 +645,7 @@ pub fn merge_cached_graphs(
                 slug: key.clone(),
                 title: node.title.clone(),
                 r#type: node.r#type.clone(),
+                id: node.id,
                 external: false,
             });
             global_idx.insert(key, new_idx);
@@ -673,6 +698,7 @@ pub fn merge_cached_graphs(
                             slug: to_key.clone(),
                             title: to_node.title.clone(),
                             r#type: "external".to_string(),
+                            id: None,
                             external: true,
                         })
                     })

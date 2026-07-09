@@ -11,6 +11,7 @@ use tantivy::{
     query::{AllQuery, TermQuery},
     schema::IndexRecordOption,
 };
+use ulid::Ulid;
 
 use crate::engine::EngineState;
 use crate::graph::{GraphFilter, WikiGraph, get_or_build_graph};
@@ -82,6 +83,8 @@ pub fn run_lint(
             "missing-fields",
             "stale",
             "unknown-type",
+            "duplicate-id",
+            "id-format",
             "articulation-point",
             "bridge",
             "periphery",
@@ -138,6 +141,12 @@ pub fn run_lint(
             wiki_root,
             &space.type_registry,
         )?);
+    }
+    if active_rules.contains("duplicate-id") {
+        findings.extend(rule_duplicate_id(&searcher, is, wiki_root)?);
+    }
+    if active_rules.contains("id-format") {
+        findings.extend(rule_id_format(&searcher, is, wiki_root)?);
     }
 
     let needs_graph = active_rules.contains("articulation-point")
@@ -215,18 +224,46 @@ fn rule_orphan(
 ) -> Result<Vec<LintFinding>> {
     let f_slug = is.field("slug");
     let f_type = is.field("type");
+    let f_id = is.field("id");
+
+    let all_addrs = searcher.search(&AllQuery, &tantivy::collector::DocSetCollector)?;
+
+    // Map each declared stable id (canonical form) to its slug, so a page
+    // linked only by id still counts as linked.
+    let mut id_to_slug: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+    for addr in &all_addrs {
+        let doc: tantivy::TantivyDocument = searcher.doc(*addr)?;
+        if let (Some(id), Some(slug)) = (
+            doc.get_first(f_id)
+                .and_then(|v| v.as_str())
+                .and_then(|s| Ulid::from_string(s).ok()),
+            doc.get_first(f_slug).and_then(|v| v.as_str()),
+        ) {
+            id_to_slug.insert(id.to_string(), slug.to_string());
+        }
+    }
 
     // Collect all slugs referenced in body_links across all docs
     let mut all_linked: HashSet<String> = HashSet::new();
     let f_body_links = is.field("body_links");
 
-    let all_addrs = searcher.search(&AllQuery, &tantivy::collector::DocSetCollector)?;
+    let insert_target = |all_linked: &mut HashSet<String>, target: &str| {
+        all_linked.insert(target.to_string());
+        // An id target also credits the page that declares the id
+        if let Some(slug) = Ulid::from_string(target)
+            .ok()
+            .and_then(|id| id_to_slug.get(&id.to_string()))
+        {
+            all_linked.insert(slug.clone());
+        }
+    };
 
     for addr in &all_addrs {
         let doc: tantivy::TantivyDocument = searcher.doc(*addr)?;
         for val in doc.get_all(f_body_links) {
             if let Some(s) = val.as_str() {
-                all_linked.insert(s.to_string());
+                insert_target(&mut all_linked, s);
             }
         }
         // Also count frontmatter edge fields as incoming-link evidence
@@ -234,7 +271,7 @@ fn rule_orphan(
             if let Some(f) = is.try_field(field_name) {
                 for val in doc.get_all(f) {
                     if let Some(s) = val.as_str() {
-                        all_linked.insert(s.to_string());
+                        insert_target(&mut all_linked, s);
                     }
                 }
             }
@@ -283,12 +320,27 @@ fn rule_orphan(
 
 // ── Rule: broken-link ─────────────────────────────────────────────────────────
 
-fn slug_exists(searcher: &tantivy::Searcher, is: &IndexSchema, slug: &str) -> Result<bool> {
-    let f_slug = is.field("slug");
-    let term = Term::from_field_text(f_slug, slug);
+/// Return true if a link target resolves to an indexed page — by slug
+/// first, then by stable id (canonical ULID form).
+fn target_exists(searcher: &tantivy::Searcher, is: &IndexSchema, target: &str) -> Result<bool> {
+    let term = Term::from_field_text(is.field("slug"), target);
     let query = TermQuery::new(term, IndexRecordOption::Basic);
-    let results = searcher.search(&query, &tantivy::collector::DocSetCollector)?;
-    Ok(!results.is_empty())
+    if !searcher
+        .search(&query, &tantivy::collector::DocSetCollector)?
+        .is_empty()
+    {
+        return Ok(true);
+    }
+
+    if let Ok(id) = Ulid::from_string(target) {
+        let term = Term::from_field_text(is.field("id"), &id.to_string());
+        let query = TermQuery::new(term, IndexRecordOption::Basic);
+        return Ok(!searcher
+            .search(&query, &tantivy::collector::DocSetCollector)?
+            .is_empty());
+    }
+
+    Ok(false)
 }
 
 fn rule_broken_link(
@@ -349,7 +401,7 @@ fn rule_broken_link(
                     }
                     continue;
                 }
-                if !slug_exists(searcher, is, target)? {
+                if !target_exists(searcher, is, target)? {
                     findings.push(LintFinding {
                         path: slug_path(&slug, wiki_root),
                         slug: slug.clone(),
@@ -359,6 +411,95 @@ fn rule_broken_link(
                     });
                 }
             }
+        }
+    }
+
+    Ok(findings)
+}
+
+// ── Rule: duplicate-id ────────────────────────────────────────────────────────
+
+fn rule_duplicate_id(
+    searcher: &tantivy::Searcher,
+    is: &IndexSchema,
+    wiki_root: &Path,
+) -> Result<Vec<LintFinding>> {
+    let f_slug = is.field("slug");
+    let f_id = is.field("id");
+
+    let all_addrs = searcher.search(&AllQuery, &tantivy::collector::DocSetCollector)?;
+
+    let mut id_to_slugs: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for addr in &all_addrs {
+        let doc: tantivy::TantivyDocument = searcher.doc(*addr)?;
+        if let (Some(id), Some(slug)) = (
+            doc.get_first(f_id).and_then(|v| v.as_str()),
+            doc.get_first(f_slug).and_then(|v| v.as_str()),
+        ) {
+            id_to_slugs
+                .entry(id.to_string())
+                .or_default()
+                .push(slug.to_string());
+        }
+    }
+
+    let mut findings = Vec::new();
+    for (id, mut slugs) in id_to_slugs {
+        if slugs.len() < 2 {
+            continue;
+        }
+        slugs.sort();
+        for slug in &slugs {
+            let others: Vec<&str> = slugs
+                .iter()
+                .filter(|s| *s != slug)
+                .map(|s| s.as_str())
+                .collect();
+            findings.push(LintFinding {
+                path: slug_path(slug, wiki_root),
+                slug: slug.clone(),
+                rule: "duplicate-id",
+                severity: Severity::Error,
+                message: format!("duplicate id {id} also used by: {}", others.join(", ")),
+            });
+        }
+    }
+
+    Ok(findings)
+}
+
+// ── Rule: id-format ───────────────────────────────────────────────────────────
+
+fn rule_id_format(
+    searcher: &tantivy::Searcher,
+    is: &IndexSchema,
+    wiki_root: &Path,
+) -> Result<Vec<LintFinding>> {
+    let f_slug = is.field("slug");
+    let f_id = is.field("id");
+
+    let all_addrs = searcher.search(&AllQuery, &tantivy::collector::DocSetCollector)?;
+
+    let mut findings = Vec::new();
+    for addr in &all_addrs {
+        let doc: tantivy::TantivyDocument = searcher.doc(*addr)?;
+        let Some(slug) = doc.get_first(f_slug).and_then(|v| v.as_str()) else {
+            continue;
+        };
+        let Some(raw_id) = doc.get_first(f_id).and_then(|v| v.as_str()) else {
+            continue;
+        };
+        if Ulid::from_string(raw_id).is_err() {
+            findings.push(LintFinding {
+                path: slug_path(slug, wiki_root),
+                slug: slug.to_string(),
+                rule: "id-format",
+                severity: Severity::Warning,
+                message: format!(
+                    "id is not a valid ULID: {raw_id} — it cannot be used as a link target"
+                ),
+            });
         }
     }
 
@@ -680,6 +821,7 @@ mod tests {
                         slug: s.to_string(),
                         title: s.to_string(),
                         r#type: "page".to_string(),
+                        id: None,
                         external: false,
                     }),
                 )
@@ -704,12 +846,14 @@ mod tests {
             slug: "a".into(),
             title: "a".into(),
             r#type: "page".into(),
+            id: None,
             external: false,
         });
         let ext = g.add_node(PageNode {
             slug: "b".into(),
             title: "b".into(),
             r#type: "page".into(),
+            id: None,
             external: true,
         });
         g.add_edge(

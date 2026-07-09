@@ -65,7 +65,8 @@ pub fn backlinks_query(
     Ok(refs)
 }
 
-/// Return all pages linking to `target_slug` in the named wiki.
+/// Return all pages linking to `target_slug` in the named wiki — by slug
+/// or by the target page's stable id.
 pub fn backlinks_for(
     engine: &EngineState,
     wiki_name: &str,
@@ -73,7 +74,16 @@ pub fn backlinks_for(
 ) -> Result<Vec<BacklinkRef>> {
     let space = engine.space(wiki_name)?;
     let searcher = space.index_manager.searcher()?;
-    backlinks_query(&searcher, &space.index_schema, target_slug)
+    let is = &space.index_schema;
+
+    let mut refs = backlinks_query(&searcher, is, target_slug)?;
+    if let Some(id) = crate::search::id_for_slug(&searcher, is, target_slug)? {
+        let by_id = backlinks_query(&searcher, is, &id.to_string())?;
+        let seen: std::collections::HashSet<String> = refs.iter().map(|r| r.slug.clone()).collect();
+        refs.extend(by_id.into_iter().filter(|r| !seen.contains(&r.slug)));
+        refs.sort_by(|a, b| a.slug.cmp(&b.slug));
+    }
+    Ok(refs)
 }
 
 /// Result of a content read — page text, asset list, or binary asset.

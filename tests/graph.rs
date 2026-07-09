@@ -880,3 +880,41 @@ fn graphfilter_with_root_not_default() {
     };
     assert!(!f.is_default());
 }
+
+// ── stable page id edges ──────────────────────────────────────────────────────
+
+#[test]
+fn build_graph_resolves_id_link_to_edge() {
+    let dir = tempfile::tempdir().unwrap();
+    let wiki_root = setup_repo(dir.path());
+    write_page(
+        &wiki_root,
+        "concepts/linker.md",
+        &page_with_body_links("Linker", "See [[01ARZ3NDEKTSV4RRFFQ69G5FAV]]."),
+    );
+    write_page(
+        &wiki_root,
+        "concepts/target.md",
+        "---\ntitle: \"Target\"\nid: 01ARZ3NDEKTSV4RRFFQ69G5FAV\ntype: concept\nstatus: active\n---\n\nBody.\n",
+    );
+
+    let mgr = build_index(dir.path(), &wiki_root);
+    let is = schema();
+    let g = build_graph(
+        &mgr.searcher().unwrap(),
+        &is,
+        &default_filter(),
+        &registry(),
+    )
+    .unwrap();
+
+    assert_eq!(g.edge_count(), 1, "id link must produce an edge");
+    let edge = g.edge_indices().next().unwrap();
+    let (from, to) = g.edge_endpoints(edge).unwrap();
+    assert_eq!(g[from].slug, "concepts/linker");
+    assert_eq!(g[to].slug, "concepts/target");
+    assert_eq!(
+        g[to].id.map(|u| u.to_string()).as_deref(),
+        Some("01ARZ3NDEKTSV4RRFFQ69G5FAV")
+    );
+}

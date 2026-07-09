@@ -651,7 +651,11 @@ fn index_page(
     }
 
     for link in links::extract_body_wikilinks(&page.body) {
-        doc.add_text(is.field("body_links"), &link);
+        // Id links index in canonical ULID form so term lookups always match
+        match ulid::Ulid::from_string(&link) {
+            Ok(id) => doc.add_text(is.field("body_links"), id.to_string()),
+            Err(_) => doc.add_text(is.field("body_links"), &link),
+        }
     }
 
     doc

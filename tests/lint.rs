@@ -653,3 +653,130 @@ fn lint_finding_path_is_populated() {
         );
     }
 }
+
+// ── stable page id rules ──────────────────────────────────────────────────────
+
+const LINT_ULID: &str = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+
+fn page_with_id(title: &str, id: &str) -> String {
+    format!("---\ntitle: \"{title}\"\nid: {id}\ntype: concept\nstatus: active\n---\n\nBody.\n")
+}
+
+#[test]
+fn id_links_are_not_broken() {
+    let dir = tempfile::tempdir().unwrap();
+    let wiki_root = setup_repo(dir.path());
+    write_page(
+        &wiki_root,
+        "decisions/a.md",
+        &format!(
+            "---\ntitle: \"A\"\ntype: concept\nstatus: active\nsuperseded_by: {LINT_ULID}\n---\n\nSee [[{LINT_ULID}]].\n"
+        ),
+    );
+    write_page(&wiki_root, "decisions/b.md", &page_with_id("B", LINT_ULID));
+
+    let engine = build_engine(dir.path(), &wiki_root);
+    let report = run_lint(&engine, "test", Some("broken-link"), None).unwrap();
+    assert_eq!(
+        report.errors, 0,
+        "id links must resolve: {:?}",
+        report.findings
+    );
+}
+
+#[test]
+fn unknown_id_link_is_broken() {
+    let dir = tempfile::tempdir().unwrap();
+    let wiki_root = setup_repo(dir.path());
+    write_page(
+        &wiki_root,
+        "decisions/a.md",
+        "---\ntitle: \"A\"\ntype: concept\nstatus: active\n---\n\nSee [[01BX5ZZKBKACTAV9WEVGEMMVRZ]].\n",
+    );
+
+    let engine = build_engine(dir.path(), &wiki_root);
+    let report = run_lint(&engine, "test", Some("broken-link"), None).unwrap();
+    let broken = findings_for_rule(&report.findings, "broken-link");
+    assert_eq!(broken.len(), 1, "unknown id must dangle");
+    assert_eq!(broken[0].severity, Severity::Error);
+}
+
+#[test]
+fn duplicate_id_reported_on_every_participant() {
+    let dir = tempfile::tempdir().unwrap();
+    let wiki_root = setup_repo(dir.path());
+    write_page(&wiki_root, "decisions/x.md", &page_with_id("X", LINT_ULID));
+    write_page(&wiki_root, "decisions/y.md", &page_with_id("Y", LINT_ULID));
+
+    let engine = build_engine(dir.path(), &wiki_root);
+    let report = run_lint(&engine, "test", Some("duplicate-id"), None).unwrap();
+    let dups = findings_for_rule(&report.findings, "duplicate-id");
+    assert_eq!(dups.len(), 2);
+    for f in &dups {
+        assert_eq!(f.severity, Severity::Error);
+        assert!(f.message.contains(LINT_ULID));
+    }
+    let slugs = slugs_for_rule(&report.findings, "duplicate-id");
+    assert!(slugs.contains(&"decisions/x".to_string()));
+    assert!(slugs.contains(&"decisions/y".to_string()));
+}
+
+#[test]
+fn id_format_warns_on_malformed_id() {
+    let dir = tempfile::tempdir().unwrap();
+    let wiki_root = setup_repo(dir.path());
+    write_page(
+        &wiki_root,
+        "decisions/bad.md",
+        &page_with_id("Bad", "not-a-ulid"),
+    );
+
+    let engine = build_engine(dir.path(), &wiki_root);
+    let report = run_lint(&engine, "test", Some("id-format"), None).unwrap();
+    let findings = findings_for_rule(&report.findings, "id-format");
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0].severity, Severity::Warning);
+    assert!(findings[0].message.contains("not-a-ulid"));
+}
+
+#[test]
+fn page_linked_only_by_id_is_not_an_orphan() {
+    let dir = tempfile::tempdir().unwrap();
+    let wiki_root = setup_repo(dir.path());
+    write_page(
+        &wiki_root,
+        "decisions/linker.md",
+        &format!(
+            "---\ntitle: \"Linker\"\ntype: concept\nstatus: active\n---\n\nSee [[{LINT_ULID}]].\n"
+        ),
+    );
+    write_page(
+        &wiki_root,
+        "decisions/target.md",
+        &page_with_id("Target", LINT_ULID),
+    );
+
+    let engine = build_engine(dir.path(), &wiki_root);
+    let report = run_lint(&engine, "test", Some("orphan"), None).unwrap();
+    let orphans = slugs_for_rule(&report.findings, "orphan");
+    assert!(
+        !orphans.contains(&"decisions/target".to_string()),
+        "id-linked page must not be an orphan: {orphans:?}"
+    );
+}
+
+#[test]
+fn id_rules_silent_on_id_free_wiki() {
+    let dir = tempfile::tempdir().unwrap();
+    let wiki_root = setup_repo(dir.path());
+    write_page(
+        &wiki_root,
+        "concepts/plain.md",
+        "---\ntitle: \"Plain\"\ntype: concept\nstatus: active\n---\n\nBody.\n",
+    );
+
+    let engine = build_engine(dir.path(), &wiki_root);
+    let report = run_lint(&engine, "test", None, None).unwrap();
+    assert!(findings_for_rule(&report.findings, "duplicate-id").is_empty());
+    assert!(findings_for_rule(&report.findings, "id-format").is_empty());
+}

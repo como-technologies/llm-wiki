@@ -267,6 +267,30 @@ fn unknown_id_reports_page_not_found() {
 }
 
 #[test]
+fn backlinks_include_pages_linking_by_id() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = setup_wiki_with_id(dir.path(), "test");
+    let wiki_root = dir.path().join("test").join("wiki");
+    std::fs::write(
+        wiki_root.join("concepts/id-linker.md"),
+        format!(
+            "---\ntitle: \"IdLinker\"\ntype: concept\nstatus: active\n---\n\nSee [[{STABLE_ID}]].\n"
+        ),
+    )
+    .unwrap();
+    llm_wiki::git::commit(&dir.path().join("test"), "add id linker").unwrap();
+
+    let manager = WikiEngine::build(&config_path).unwrap();
+    let engine = manager.state.read().unwrap();
+
+    let refs = ops::backlinks_for(&engine, "test", "concepts/stable").unwrap();
+    assert!(
+        refs.iter().any(|r| r.slug == "concepts/id-linker"),
+        "id-based link must appear in the target's backlinks: {refs:?}"
+    );
+}
+
+#[test]
 fn content_write_by_id_edits_declaring_page() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki_with_id(dir.path(), "test");

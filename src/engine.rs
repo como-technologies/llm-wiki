@@ -480,7 +480,9 @@ fn build_wiki_graph_cache(
 
     let snap_cfg = SnapshotConfig {
         dir: state_dir.join("snapshots").join(wiki_name),
-        name: "wiki-graph".into(),
+        // v2: PageNode gained the `id` field — old bincode snapshots are
+        // layout-incompatible, so a new name forces one cold rebuild.
+        name: "wiki-graph-v2".into(),
         key: None,
         format: SnapshotFormat::Bincode,
         compression,
