@@ -44,7 +44,7 @@ impl IndexSchema {
         // Collect and classify fields from all schemas
         let mut seen: HashSet<String> = HashSet::new();
         // Fixed fields are already added
-        for name in &["slug", "uri", "body", "body_links"] {
+        for name in &["slug", "uri", "id", "body", "body_links"] {
             seen.insert(name.to_string());
         }
 
@@ -271,6 +271,7 @@ impl SchemaBuilder {
         self.keyword_fields.insert("slug".to_string());
 
         self.add_keyword("uri");
+        self.add_keyword("id");
         self.add_text("body");
         self.add_keyword("body_links");
     }

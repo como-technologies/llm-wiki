@@ -65,6 +65,9 @@ walkdir    = "2"
 # Date/time
 chrono     = { version = "0.4", default-features = false, features = ["clock", "std"] }
 
+# Stable page identity
+ulid       = { version = "1", features = ["serde"] }
+
 # Git
 git2       = { version = "0.21", default-features = false, features = ["vendored-libgit2"] }
 

@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use anyhow::{Result, bail};
 use chrono::Local;
 use serde_yaml::Value;
+use ulid::Ulid;
 
 /// Read page-level `confidence` from frontmatter; map legacy string values.
 pub fn confidence(fm: &BTreeMap<String, Value>) -> f32 {
@@ -60,6 +61,19 @@ impl ParsedPage {
         self.frontmatter
             .get("superseded_by")
             .and_then(|v| v.as_str())
+    }
+
+    /// Return the stable page `id` from frontmatter, if present and a valid ULID.
+    ///
+    /// Parsing is case-insensitive; a malformed id yields `None` (use
+    /// [`raw_id`](Self::raw_id) to inspect the raw value, e.g. for lint).
+    pub fn id(&self) -> Option<Ulid> {
+        self.raw_id().and_then(|s| Ulid::from_string(s).ok())
+    }
+
+    /// Return the raw `id` frontmatter string, valid ULID or not.
+    pub fn raw_id(&self) -> Option<&str> {
+        self.frontmatter.get("id").and_then(|v| v.as_str())
     }
 
     /// Return a YAML sequence field as a `Vec<&str>`; empty if absent or not a sequence.

@@ -825,6 +825,157 @@ fn staleness_kind_detects_type_modification() {
     }
 }
 
+// ── stable page id ────────────────────────────────────────────────────────────
+
+const TEST_ULID: &str = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+
+fn concept_page_with_id(title: &str, id: &str, body: &str) -> String {
+    format!(
+        "---\ntitle: \"{title}\"\nid: {id}\nsummary: \"A concept\"\nstatus: active\ntype: concept\n---\n\n{body}\n"
+    )
+}
+
+fn find_doc_by_term(
+    searcher: &Searcher,
+    is: &IndexSchema,
+    field: &str,
+    value: &str,
+) -> Option<tantivy::TantivyDocument> {
+    use tantivy::collector::TopDocs;
+    use tantivy::query::TermQuery;
+    use tantivy::schema::IndexRecordOption;
+
+    let term = tantivy::Term::from_field_text(is.field(field), value);
+    let query = TermQuery::new(term, IndexRecordOption::Basic);
+    let hits = searcher
+        .search(&query, &TopDocs::with_limit(2).order_by_score())
+        .ok()?;
+    let (_, addr) = hits.first()?;
+    searcher.doc(*addr).ok()
+}
+
+fn first_str<'a>(
+    doc: &'a tantivy::TantivyDocument,
+    is: &IndexSchema,
+    field: &str,
+) -> Option<&'a str> {
+    use tantivy::schema::Value;
+    doc.get_first(is.field(field)).and_then(|v| v.as_str())
+}
+
+#[test]
+fn rebuild_indexes_id_as_queryable_term() {
+    let dir = tempfile::tempdir().unwrap();
+    let wiki_root = setup_repo(dir.path());
+    write_page(
+        &wiki_root,
+        "concepts/with-id.md",
+        &concept_page_with_id("WithId", TEST_ULID, "body"),
+    );
+    write_page(
+        &wiki_root,
+        "concepts/plain.md",
+        &concept_page("Plain", "body"),
+    );
+
+    let mgr = build_index(dir.path(), &wiki_root);
+    let is = schema();
+    let searcher = mgr.searcher().unwrap();
+
+    let doc = find_doc_by_term(&searcher, &is, "id", TEST_ULID).expect("id term should hit");
+    assert_eq!(first_str(&doc, &is, "slug"), Some("concepts/with-id"));
+}
+
+#[test]
+fn rebuild_stores_canonical_uppercase_id() {
+    let dir = tempfile::tempdir().unwrap();
+    let wiki_root = setup_repo(dir.path());
+    write_page(
+        &wiki_root,
+        "concepts/lower.md",
+        &concept_page_with_id("Lower", &TEST_ULID.to_lowercase(), "body"),
+    );
+
+    let mgr = build_index(dir.path(), &wiki_root);
+    let is = schema();
+    let searcher = mgr.searcher().unwrap();
+
+    let doc = find_doc_by_term(&searcher, &is, "id", TEST_ULID)
+        .expect("canonical uppercase term should hit a lowercase-declared id");
+    assert_eq!(first_str(&doc, &is, "id"), Some(TEST_ULID));
+}
+
+#[test]
+fn rebuild_stores_malformed_id_verbatim() {
+    let dir = tempfile::tempdir().unwrap();
+    let wiki_root = setup_repo(dir.path());
+    write_page(
+        &wiki_root,
+        "concepts/bad-id.md",
+        &concept_page_with_id("BadId", "not-a-ulid", "body"),
+    );
+
+    let mgr = build_index(dir.path(), &wiki_root);
+    let is = schema();
+    let searcher = mgr.searcher().unwrap();
+
+    let doc = find_doc_by_term(&searcher, &is, "slug", "concepts/bad-id").unwrap();
+    assert_eq!(
+        first_str(&doc, &is, "id"),
+        Some("not-a-ulid"),
+        "malformed id must be stored verbatim so lint can report it"
+    );
+}
+
+#[test]
+fn update_preserves_id_after_edit() {
+    let dir = tempfile::tempdir().unwrap();
+    let wiki_root = setup_repo(dir.path());
+    write_page(
+        &wiki_root,
+        "concepts/keeper.md",
+        &concept_page_with_id("Keeper", TEST_ULID, "original"),
+    );
+
+    let mgr = build_index(dir.path(), &wiki_root);
+    let is = schema();
+    let reg = registry();
+
+    write_page(
+        &wiki_root,
+        "concepts/keeper.md",
+        &concept_page_with_id("Keeper", TEST_ULID, "edited body"),
+    );
+    let report = mgr.update(&wiki_root, dir.path(), None, &is, &reg).unwrap();
+    assert_eq!(report.updated, 1);
+
+    let searcher = open_searcher(&mgr, &is);
+    let doc = find_doc_by_term(&searcher, &is, "id", TEST_ULID)
+        .expect("id term should still hit after incremental update");
+    assert_eq!(first_str(&doc, &is, "slug"), Some("concepts/keeper"));
+}
+
+#[test]
+fn page_without_id_has_no_id_value() {
+    let dir = tempfile::tempdir().unwrap();
+    let wiki_root = setup_repo(dir.path());
+    write_page(
+        &wiki_root,
+        "concepts/plain.md",
+        &concept_page("Plain", "body"),
+    );
+
+    let mgr = build_index(dir.path(), &wiki_root);
+    let is = schema();
+    let searcher = mgr.searcher().unwrap();
+
+    let doc = find_doc_by_term(&searcher, &is, "slug", "concepts/plain").unwrap();
+    assert!(
+        first_str(&doc, &is, "id").is_none(),
+        "no behavior change for pages without an id"
+    );
+}
+
 // ── reader reload ─────────────────────────────────────────────────────────────
 
 #[test]

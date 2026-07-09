@@ -75,6 +75,51 @@ fn superseded_by_absent() {
 }
 
 #[test]
+fn id_accessor_valid_ulid() {
+    let content = "---\ntitle: \"Page\"\nid: 01ARZ3NDEKTSV4RRFFQ69G5FAV\n---\n\n";
+    let page = parse(content);
+    assert_eq!(page.id().unwrap().to_string(), "01ARZ3NDEKTSV4RRFFQ69G5FAV");
+    assert_eq!(page.raw_id(), Some("01ARZ3NDEKTSV4RRFFQ69G5FAV"));
+}
+
+#[test]
+fn id_accessor_normalizes_lowercase() {
+    let content = "---\ntitle: \"Page\"\nid: 01arz3ndektsv4rrffq69g5fav\n---\n\n";
+    let page = parse(content);
+    assert_eq!(
+        page.id().unwrap().to_string(),
+        "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+        "parse is case-insensitive; canonical form is uppercase"
+    );
+}
+
+#[test]
+fn id_accessor_absent() {
+    let content = "---\ntitle: \"Page\"\n---\n\n";
+    let page = parse(content);
+    assert_eq!(page.id(), None);
+    assert_eq!(page.raw_id(), None);
+}
+
+#[test]
+fn id_accessor_malformed_yields_none_but_raw_preserved() {
+    for bad in ["ADR-0001", "not-a-ulid", "01ARZ3NDEKTSV4RRFFQ69G5FA", ""] {
+        let content = format!("---\ntitle: \"Page\"\nid: \"{bad}\"\n---\n\n");
+        let page = parse(&content);
+        assert_eq!(page.id(), None, "{bad:?} must not parse as a ULID");
+        assert_eq!(page.raw_id(), Some(bad), "raw value must stay reachable");
+    }
+}
+
+#[test]
+fn id_accessor_non_string_yields_none() {
+    let content = "---\ntitle: \"Page\"\nid: 12345\n---\n\n";
+    let page = parse(content);
+    assert_eq!(page.id(), None);
+    assert_eq!(page.raw_id(), None);
+}
+
+#[test]
 fn string_list_missing_key() {
     let content = "---\ntitle: \"Page\"\n---\n\n";
     let page = parse(content);

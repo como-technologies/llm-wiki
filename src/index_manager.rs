@@ -275,6 +275,8 @@ impl SpaceIndexManager {
         let mut pages = 0usize;
         let mut sections = 0usize;
         let mut skipped = 0usize;
+        let mut seen_ids: std::collections::HashMap<String, String> =
+            std::collections::HashMap::new();
 
         for entry in WalkDir::new(wiki_root).into_iter().filter_map(|e| e.ok()) {
             let path = entry.path();
@@ -301,6 +303,17 @@ impl SpaceIndexManager {
             };
             let uri = format!("wiki://{}/{slug}", self.wiki_name);
             let page = frontmatter::parse(&content);
+
+            if let Some(id) = page.id()
+                && let Some(first_slug) = seen_ids.insert(id.to_string(), slug.as_str().to_string())
+            {
+                tracing::warn!(
+                    id = %id,
+                    first = %first_slug,
+                    second = %slug,
+                    "duplicate page id",
+                );
+            }
 
             writer.add_document(index_page(is, registry, slug.as_str(), &uri, &page))?;
 
@@ -598,6 +611,15 @@ fn index_page(
     doc.add_text(is.field("slug"), slug);
     doc.add_text(is.field("uri"), uri);
 
+    // Stable page id: store the canonical ULID form when it parses, the raw
+    // string otherwise so lint can report the malformed value. Resolution
+    // only ever queries canonical forms.
+    if let Some(id) = page.id() {
+        doc.add_text(is.field("id"), id.to_string());
+    } else if let Some(raw) = page.raw_id() {
+        doc.add_text(is.field("id"), raw);
+    }
+
     // Write confidence as f64 FAST field using the dedicated getter
     if let Some(conf_field) = is.try_field("confidence") {
         let conf = frontmatter::confidence(&page.frontmatter) as f64;
@@ -610,6 +632,10 @@ fn index_page(
     for (canonical, value) in &resolved {
         // confidence is already written above as a numeric field; skip text indexing
         if canonical == "confidence" {
+            continue;
+        }
+        // id is already written above in canonical form; skip re-indexing the raw value
+        if canonical == "id" {
             continue;
         }
         index_value(&mut doc, &mut extra_text, is, canonical, value);
