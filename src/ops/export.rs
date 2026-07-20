@@ -79,7 +79,9 @@ struct PageEntry {
     title: String,
     r#type: String,
     status: String,
-    confidence: f64,
+    /// Frontmatter `confidence`; omitted when the page does not declare one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    confidence: Option<f64>,
     summary: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     body: Option<String>,
@@ -194,8 +196,7 @@ fn collect_pages(
             .to_string();
         let confidence = f_confidence
             .and_then(|f| doc.get_first(f))
-            .and_then(|v| v.as_f64())
-            .unwrap_or(0.5);
+            .and_then(|v| v.as_f64());
         let summary = f_summary
             .and_then(|f| doc.get_first(f))
             .and_then(|v| v.as_str())
