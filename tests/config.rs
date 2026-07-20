@@ -520,6 +520,62 @@ deprecated = 0.1
 }
 
 #[test]
+fn set_get_search_status_round_trips() {
+    let mut g = GlobalConfig::default();
+
+    // Built-in key
+    set_global_config_value(&mut g, "search.status.archived", "0.2").unwrap();
+    assert_eq!(g.search.status.get("archived").copied(), Some(0.2_f32));
+
+    // Custom key not in the default map
+    set_global_config_value(&mut g, "search.status.superseded", "0.05").unwrap();
+    assert_eq!(g.search.status.get("superseded").copied(), Some(0.05_f32));
+
+    let resolved = resolve(&g, &WikiConfig::default());
+    assert_eq!(
+        get_config_value(&resolved, &g, "search.status.archived"),
+        "0.2"
+    );
+    assert_eq!(
+        get_config_value(&resolved, &g, "search.status.superseded"),
+        "0.05"
+    );
+
+    // Non-numeric values and empty keys are rejected
+    assert!(set_global_config_value(&mut g, "search.status.superseded", "high").is_err());
+    assert!(set_global_config_value(&mut g, "search.status.", "0.5").is_err());
+
+    // Unknown status key reads as unknown
+    assert!(get_config_value(&resolved, &g, "search.status.nonexistent").contains("unknown"));
+}
+
+#[test]
+fn set_wiki_search_status_merges_into_resolved() {
+    let g = GlobalConfig::default();
+    let mut wiki_cfg = WikiConfig::default();
+
+    set_wiki_config_value(&mut wiki_cfg, "search.status.superseded", "0.1").unwrap();
+    set_wiki_config_value(&mut wiki_cfg, "search.status.archived", "0.0").unwrap();
+
+    let resolved = resolve(&g, &wiki_cfg);
+    assert_eq!(
+        resolved.search.status.get("superseded").copied(),
+        Some(0.1_f32),
+        "custom wiki key added"
+    );
+    assert_eq!(
+        resolved.search.status.get("archived").copied(),
+        Some(0.0_f32),
+        "wiki key overrides global"
+    );
+    assert_eq!(
+        resolved.search.status.get("active").copied(),
+        Some(1.0_f32),
+        "untouched global defaults inherited"
+    );
+}
+
+#[test]
 fn resolve_search_status_merges_per_wiki() {
     let global = GlobalConfig {
         search: SearchConfig {
