@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -83,9 +83,28 @@ struct PageEntry {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     confidence: Option<f64>,
     summary: String,
+    /// Remaining frontmatter fields — everything the page declares that is
+    /// not already surfaced as a top-level export field. JSON format only;
+    /// omitted when the page has no extra fields.
+    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
+    frontmatter: serde_json::Map<String, serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     body: Option<String>,
 }
+
+/// Frontmatter fields already surfaced as top-level `PageEntry` fields —
+/// never repeated inside the `frontmatter` object.
+const TOP_LEVEL_FIELDS: &[&str] = &[
+    "slug",
+    "uri",
+    "id",
+    "title",
+    "type",
+    "status",
+    "confidence",
+    "summary",
+    "body",
+];
 
 // ── export ────────────────────────────────────────────────────────────────────
 
@@ -103,7 +122,9 @@ pub fn export(engine: &EngineState, options: &ExportOptions) -> Result<ExportRep
 
     let need_bodies = matches!(options.format, ExportFormat::LlmsFull | ExportFormat::Json);
     let pages = if need_bodies {
-        load_bodies(pages, wiki_root)?
+        // Only the JSON format serializes PageEntry, so only it carries
+        // the remaining frontmatter fields.
+        load_bodies(pages, wiki_root, options.format == ExportFormat::Json)?
     } else {
         pages
     };
@@ -220,6 +241,7 @@ fn collect_pages(
             status,
             confidence,
             summary,
+            frontmatter: serde_json::Map::new(),
             body: None,
         });
     }
@@ -245,18 +267,45 @@ fn collect_pages(
     Ok(pages)
 }
 
-fn load_bodies(mut pages: Vec<PageEntry>, wiki_root: &Path) -> Result<Vec<PageEntry>> {
+fn load_bodies(
+    mut pages: Vec<PageEntry>,
+    wiki_root: &Path,
+    with_frontmatter: bool,
+) -> Result<Vec<PageEntry>> {
     for page in &mut pages {
         let path = wiki_root.join(format!("{}.md", page.slug));
         if path.exists() {
             let raw = std::fs::read_to_string(&path)
                 .with_context(|| format!("failed to read {}", path.display()))?;
-            // Strip frontmatter (between --- delimiters)
-            let body = strip_frontmatter(&raw);
-            page.body = Some(body.to_string());
+            if with_frontmatter {
+                let parsed = crate::frontmatter::parse(&raw);
+                page.frontmatter = remaining_frontmatter(&parsed.frontmatter);
+                page.body = Some(parsed.body);
+            } else {
+                // Strip frontmatter (between --- delimiters)
+                let body = strip_frontmatter(&raw);
+                page.body = Some(body.to_string());
+            }
         }
     }
     Ok(pages)
+}
+
+/// Convert the frontmatter fields not surfaced as top-level export fields
+/// into a JSON object, preserving YAML typing (strings, numbers, arrays).
+fn remaining_frontmatter(
+    fm: &BTreeMap<String, serde_yaml::Value>,
+) -> serde_json::Map<String, serde_json::Value> {
+    fm.iter()
+        // `String::as_str` spelled out — the `tantivy::schema::Value` trait
+        // in scope also provides an `as_str` that method resolution prefers.
+        .filter(|(key, _)| !TOP_LEVEL_FIELDS.contains(&String::as_str(key)))
+        .filter_map(|(key, value)| {
+            serde_json::to_value(value)
+                .ok()
+                .map(|json| (key.clone(), json))
+        })
+        .collect()
 }
 
 fn strip_frontmatter(content: &str) -> &str {

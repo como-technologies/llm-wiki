@@ -172,6 +172,130 @@ fn export_excludes_archived_by_default() {
     assert!(content_all.contains("archived-page"));
 }
 
+// ── custom frontmatter fields ─────────────────────────────────────────────────
+
+#[test]
+fn export_json_includes_custom_frontmatter_fields() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = setup_wiki(dir.path(), "test");
+    let wiki_path = dir.path().join("test");
+    let wiki_root = wiki_path.join("wiki");
+
+    // Register a custom `decision` type declaring extra frontmatter fields
+    std::fs::write(
+        wiki_path.join("schemas/decision.json"),
+        r#"{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "x-wiki-types": { "decision": "A decision record" },
+  "type": "object",
+  "required": ["title", "type"],
+  "properties": {
+    "title": { "type": "string" },
+    "type": { "type": "string" },
+    "created": { "type": "string" },
+    "reference": { "type": "string" },
+    "deciders": { "type": "array", "items": { "type": "string" } },
+    "priority": { "type": "number" },
+    "supersedes": { "type": "string" }
+  },
+  "x-graph-edges": {
+    "supersedes": { "relation": "supersedes" }
+  },
+  "additionalProperties": true
+}"#,
+    )
+    .unwrap();
+
+    std::fs::write(
+        wiki_root.join("concepts/adr-1.md"),
+        "---\ntitle: \"ADR 1\"\ntype: decision\nstatus: active\ncreated: 2026-07-19\nreference: DEC-001\ndeciders: [alice, bob]\npriority: 3\nsupersedes: 01ARZ3NDEKTSV4RRFFQ69G5FAV\n---\n\nDecision body.\n",
+    )
+    .unwrap();
+    llm_wiki::git::commit(&wiki_path, "add decision").unwrap();
+
+    let manager = WikiEngine::build(&config_path).unwrap();
+    let engine = manager.state.read().unwrap();
+
+    let report = ops::export(
+        &engine,
+        &ExportOptions {
+            wiki: "test".into(),
+            path: Some("wiki.json".into()),
+            format: ExportFormat::Json,
+            include_archived: false,
+        },
+    )
+    .unwrap();
+
+    let json: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&report.path).unwrap()).unwrap();
+    let pages = json.as_array().unwrap();
+    let adr = pages
+        .iter()
+        .find(|p| p["slug"] == "concepts/adr-1")
+        .unwrap();
+
+    let fm = adr["frontmatter"]
+        .as_object()
+        .expect("frontmatter object must be present");
+    // YAML → JSON typing round-trips: date-as-string, string, array, number
+    assert_eq!(fm["created"], "2026-07-19");
+    assert_eq!(fm["reference"], "DEC-001");
+    assert_eq!(fm["deciders"], serde_json::json!(["alice", "bob"]));
+    assert_eq!(fm["priority"], 3);
+    assert_eq!(fm["supersedes"], "01ARZ3NDEKTSV4RRFFQ69G5FAV");
+    // Fields already surfaced at the top level are not repeated
+    for surfaced in ["title", "type", "status", "summary", "confidence", "id"] {
+        assert!(
+            fm.get(surfaced).is_none(),
+            "{surfaced} must not be repeated inside frontmatter"
+        );
+    }
+    // Top-level shape is unchanged
+    assert_eq!(adr["title"], "ADR 1");
+    assert_eq!(adr["type"], "decision");
+    assert_eq!(adr["status"], "active");
+    assert!(adr["body"].as_str().unwrap().contains("Decision body."));
+}
+
+#[test]
+fn export_json_omits_frontmatter_when_no_extra_fields() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = setup_wiki(dir.path(), "test");
+    let manager = WikiEngine::build(&config_path).unwrap();
+    let engine = manager.state.read().unwrap();
+
+    let report = ops::export(
+        &engine,
+        &ExportOptions {
+            wiki: "test".into(),
+            path: Some("wiki.json".into()),
+            format: ExportFormat::Json,
+            include_archived: false,
+        },
+    )
+    .unwrap();
+
+    let json: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&report.path).unwrap()).unwrap();
+    let pages = json.as_array().unwrap();
+
+    // transformer declares only title/type/status — all surfaced top-level,
+    // so the frontmatter object is omitted and the old shape is preserved
+    let transformer = pages
+        .iter()
+        .find(|p| p["slug"] == "concepts/transformer")
+        .unwrap();
+    assert!(
+        transformer.get("frontmatter").is_none(),
+        "frontmatter must be omitted when the page has no extra fields"
+    );
+
+    // moe declares tags — a field export does not surface top-level
+    let moe = pages.iter().find(|p| p["slug"] == "concepts/moe").unwrap();
+    assert_eq!(moe["frontmatter"]["tags"], serde_json::json!(["ml"]));
+}
+
 // ── stable page id ────────────────────────────────────────────────────────────
 
 #[test]
