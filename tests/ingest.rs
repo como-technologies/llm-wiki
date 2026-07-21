@@ -19,7 +19,7 @@ fn setup_repo(dir: &Path) -> std::path::PathBuf {
     let wiki_root = dir.join("wiki");
     fs::create_dir_all(&wiki_root).unwrap();
     fs::create_dir_all(dir.join("inbox")).unwrap();
-    fs::create_dir_all(dir.join("raw")).unwrap();
+    fs::create_dir_all(dir.join("evidence")).unwrap();
     git::init_repo(dir).unwrap();
     fs::write(dir.join("README.md"), "# test\n").unwrap();
     git::commit(dir, "init").unwrap();

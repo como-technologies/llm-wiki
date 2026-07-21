@@ -26,7 +26,7 @@ graph LR
 
     subgraph Repo["git repository"]
         inbox[inbox/]
-        raw[raw/]
+        evidence[evidence/]
         wiki[wiki/]
     end
 
@@ -44,7 +44,7 @@ graph LR
 
     wiki --> Git
     wiki --> Index
-    raw --> Git
+    evidence --> Git
 ```
 
 References:
@@ -62,15 +62,15 @@ graph TD
     Root --> Config["wiki.toml — config + type registry"]
     Root --> Schemas["schemas/ — JSON Schema per type"]
     Root --> Inbox["inbox/ — drop zone"]
-    Root --> Raw["raw/ — immutable archive"]
+    Root --> Evidence["evidence/ — immutable capture layer"]
     Root --> Wiki["wiki/ — compiled knowledge"]
 
     Inbox -..->|"human drops files"| Inbox
-    Raw -..->|"originals preserved"| Raw
+    Evidence -..->|"originals preserved"| Evidence
     Wiki -..->|"authors write here"| Wiki
 
     style Inbox fill:#ffeeba
-    style Raw fill:#d4edda
+    style Evidence fill:#d4edda
     style Wiki fill:#cce5ff
 ```
 

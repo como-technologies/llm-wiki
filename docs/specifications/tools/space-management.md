@@ -53,7 +53,7 @@ Creates the following structure (see
 │   ├── doc.json
 │   └── section.json
 ├── inbox/
-├── raw/
+├── evidence/
 └── wiki/              ← or the value of --wiki-root
 ```
 

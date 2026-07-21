@@ -81,7 +81,7 @@ With type as the axis:
 - A wiki can organize by domain and still have clear epistemic
   distinctions via type
 
-The physical layers (`inbox/`, `raw/`, `wiki/`) are structural, not
+The physical layers (`inbox/`, `evidence/`, `wiki/`) are structural, not
 epistemic. See [wiki-repository-layout.md](wiki-repository-layout.md).
 
 ## Why Separation Matters
@@ -92,7 +92,7 @@ The failure mode of naive RAG is collapsing these distinctions:
 |-----------|---------|
 | Sources merged into concepts | Cannot ask "which source claims this?" — provenance lost |
 | Query results merged into concepts | Conclusions presented as facts — reasoning not auditable |
-| `raw/` indexed alongside pages | Unprocessed content pollutes search |
+| `evidence/` indexed alongside pages | Unprocessed content pollutes search |
 
 Each type distinction preserves something that matters for knowledge
 quality.

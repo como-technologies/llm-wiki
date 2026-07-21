@@ -381,7 +381,7 @@ use llm_wiki::type_registry::compute_disk_hashes;
 fn setup_repo(dir: &std::path::Path) {
     fs::create_dir_all(dir.join("wiki")).unwrap();
     fs::create_dir_all(dir.join("inbox")).unwrap();
-    fs::create_dir_all(dir.join("raw")).unwrap();
+    fs::create_dir_all(dir.join("evidence")).unwrap();
     git::init_repo(dir).unwrap();
     fs::write(dir.join("README.md"), "# test\n").unwrap();
     git::commit(dir, "init").unwrap();

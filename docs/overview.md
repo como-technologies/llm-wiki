@@ -106,7 +106,7 @@ Three independent pieces, three repositories:
             │  schemas/   │
             │  wiki/      │
             │  inbox/     │
-            │  raw/       │
+            │  evidence/  │
             └─────────────┘
 ```
 
@@ -165,7 +165,7 @@ my-wiki/
 │   ├── section.md      ← body template (optional)
 │   └── ...
 ├── inbox/              ← drop zone (human puts files here)
-├── raw/                ← immutable archive (originals preserved)
+├── evidence/           ← immutable capture layer (originals preserved)
 └── wiki/               ← compiled knowledge (authors write here)
     ├── concepts/
     ├── sources/
@@ -187,7 +187,7 @@ for `wiki_content_new` (e.g. `concept.md` next to `concept.json`).
 **`inbox/`** is the human interface — drop files here for the LLM to
 process.
 
-**`raw/`** is the immutable archive — originals preserved, never
+**`evidence/`** is the immutable capture layer — originals preserved, never
 indexed.
 
 **`wiki/`** is the knowledge layer — authors (human or LLM) write
@@ -195,7 +195,7 @@ directly here. Everything inside is a page or asset. The engine indexes
 it, searches it, and builds the concept graph from it.
 
 Folder structure inside `wiki/` is the owner's choice. The engine
-enforces nothing about categories — only the `inbox/` → `raw/` →
+enforces nothing about categories — only the `inbox/` → `evidence/` →
 `wiki/` flow matters. Epistemic distinctions are carried by the `type`
 field, not by folders.
 

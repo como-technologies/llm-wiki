@@ -40,7 +40,11 @@ fn create_builds_wiki_structure() {
     assert!(report.committed);
     assert!(wiki_path.join("wiki").is_dir());
     assert!(wiki_path.join("inbox").is_dir());
-    assert!(wiki_path.join("raw").is_dir());
+    assert!(wiki_path.join("evidence").is_dir());
+    assert!(
+        !wiki_path.join("raw").exists(),
+        "new spaces use evidence/, not raw/"
+    );
     assert!(wiki_path.join("schemas").is_dir());
     assert!(wiki_path.join("README.md").is_file());
     assert!(wiki_path.join("wiki.toml").is_file());
@@ -417,7 +421,9 @@ fn validate_wiki_root_rejects_dot() {
 #[test]
 fn validate_wiki_root_rejects_reserved_dirs() {
     let dir = tempfile::tempdir().unwrap();
-    for reserved in &["inbox", "raw", "schemas"] {
+    // `raw` remains reserved for backward compatibility with spaces created
+    // before the capture layer was renamed to `evidence/`.
+    for reserved in &["inbox", "evidence", "raw", "schemas"] {
         let err = llm_wiki::spaces::validate_wiki_root(dir.path(), reserved).unwrap_err();
         assert!(
             err.to_string().contains("reserved"),
@@ -516,7 +522,10 @@ fn register_existing_basic() {
 
     // ensure_structure creates standard dirs
     assert!(wiki_path.join("inbox").exists(), "inbox/ must be created");
-    assert!(wiki_path.join("raw").exists(), "raw/ must be created");
+    assert!(
+        wiki_path.join("evidence").exists(),
+        "evidence/ must be created"
+    );
     assert!(
         wiki_path.join("schemas").exists(),
         "schemas/ must be created"
@@ -554,7 +563,10 @@ fn register_existing_with_custom_wiki_root() {
 
     // ensure_structure creates standard dirs and custom content dir
     assert!(wiki_path.join("inbox").exists(), "inbox/ must be created");
-    assert!(wiki_path.join("raw").exists(), "raw/ must be created");
+    assert!(
+        wiki_path.join("evidence").exists(),
+        "evidence/ must be created"
+    );
     assert!(
         wiki_path.join("schemas").exists(),
         "schemas/ must be created"
@@ -649,7 +661,10 @@ fn register_existing_no_prior_toml_creates_wiki_toml() {
 
     // standard dirs created
     assert!(wiki_path.join("inbox").exists(), "inbox/ must be created");
-    assert!(wiki_path.join("raw").exists(), "raw/ must be created");
+    assert!(
+        wiki_path.join("evidence").exists(),
+        "evidence/ must be created"
+    );
     assert!(
         wiki_path.join("schemas").exists(),
         "schemas/ must be created"

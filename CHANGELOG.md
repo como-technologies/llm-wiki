@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Capture layer renamed `raw/` → `evidence/`** — `spaces create` / `spaces register` now scaffold `evidence/` instead of `raw/`, matching the KB spec's name for the unstructured-capture layer. `raw` stays on the reserved-directory list (alongside `inbox`, `evidence`, `schemas`) so existing spaces with a `raw/` directory keep working and `wiki_root` can claim neither name (#10)
 - Graph snapshot name bumped to `wiki-graph-v2` — `PageNode` gained the `id` field, making old bincode snapshots layout-incompatible; each space rebuilds its graph snapshot once
 
 ### Fixed

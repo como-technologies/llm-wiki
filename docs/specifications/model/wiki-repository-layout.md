@@ -29,11 +29,11 @@ my-wiki/                    ← git root (repository root)
 │   ├── section.json
 │   └── section.md          ← body template (optional)
 ├── inbox/                  ← drop zone (human puts files here)
-├── raw/                    ← immutable archive (originals preserved)
+├── evidence/               ← immutable capture layer (originals preserved)
 └── wiki/                   ← compiled knowledge (default; configurable via wiki_root)
 ```
 
-The content directory name defaults to `wiki/` but can be changed via `wiki_root` in `wiki.toml` (e.g. `wiki_root = "content"` for repos where pages already live in `content/`). The `inbox/`, `raw/`, and `schemas/` directories are always named exactly as shown.
+The content directory name defaults to `wiki/` but can be changed via `wiki_root` in `wiki.toml` (e.g. `wiki_root = "content"` for repos where pages already live in `content/`). The `inbox/`, `evidence/`, and `schemas/` directories are always named exactly as shown. The name `raw` (the pre-rename name of the capture layer) also stays reserved so existing spaces keep working; `wiki_root` may not use it.
 
 No hidden directories in the repo. No `schema.md` — `wiki.toml` is the
 single source of truth for wiki identity, engine configuration, and the
@@ -54,7 +54,9 @@ Optional `.md` files alongside schemas provide body templates for
 
 **`inbox/`** — human interface. Drop files here for the LLM to process.
 
-**`raw/`** — immutable archive. Originals preserved, never indexed.
+**`evidence/`** — immutable capture layer. Originals preserved, never
+indexed. Spaces created before the rename use `raw/` for this layer;
+both names are reserved.
 
 **`wiki/`** (or the value of `wiki_root`) — compiled knowledge. Authors
 (human or LLM) write directly here. Everything inside is a page or asset.
@@ -64,7 +66,7 @@ The engine indexes it, searches it, and builds the concept graph from it.
 ## Folder Structure Inside the Wiki Root
 
 The owner's choice. The engine enforces nothing about categories — only
-the `inbox/` → `raw/` → `<wiki_root>/` flow matters. Epistemic distinctions
+the `inbox/` → `evidence/` → `<wiki_root>/` flow matters. Epistemic distinctions
 are carried by the `type` field, not by folders. See
 [epistemic-model.md](epistemic-model.md).
 
@@ -72,7 +74,7 @@ are carried by the `type` field, not by folders. See
 ## Roots
 
 **Repository root** — the git repository directory. Contains
-`wiki.toml`, `schemas/`, `inbox/`, `raw/`, and the wiki content directory.
+`wiki.toml`, `schemas/`, `inbox/`, `evidence/`, and the wiki content directory.
 Created by `llm-wiki spaces create`.
 
 **Wiki root** — `<repo>/<wiki_root>/` (default: `<repo>/wiki/`). All page

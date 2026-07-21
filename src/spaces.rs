@@ -208,7 +208,7 @@ fn ensure_structure(
     description: Option<&str>,
     wiki_root: &str,
 ) -> Result<()> {
-    for dir in &["inbox", "raw", "schemas"] {
+    for dir in &["inbox", "evidence", "schemas"] {
         let d = path.join(dir);
         if !d.exists() {
             std::fs::create_dir_all(&d)?;
@@ -302,7 +302,10 @@ pub fn validate_wiki_root(repo_path: &Path, wiki_root: &str) -> Result<()> {
             }
         })
         .unwrap_or_default();
-    for reserved in &["inbox", "raw", "schemas"] {
+    // `raw` stays reserved for backward compatibility: existing spaces created
+    // before the capture layer was renamed to `evidence/` still contain a
+    // `raw/` directory.
+    for reserved in &["inbox", "evidence", "raw", "schemas"] {
         if top == *reserved {
             bail!("wiki_root \"{wiki_root}\" uses reserved directory \"{reserved}\"");
         }

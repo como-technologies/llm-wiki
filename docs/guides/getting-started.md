@@ -39,7 +39,7 @@ This creates:
 │   ├── paper.json
 │   └── ...
 ├── inbox/
-├── raw/
+├── evidence/
 └── wiki/
 ```
 
