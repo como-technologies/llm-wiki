@@ -42,18 +42,28 @@ fn write_page(wiki_root: &Path, rel_path: &str, content: &str) {
 }
 
 fn build_engine(dir: &Path, wiki_root: &Path) -> EngineState {
+    build_engine_with(dir, wiki_root, || (registry(), schema()))
+}
+
+fn build_engine_with(
+    dir: &Path,
+    wiki_root: &Path,
+    build_space: impl Fn() -> (SpaceTypeRegistry, IndexSchema),
+) -> EngineState {
     let index_path = dir.join("index-store");
     git::commit(dir, "index pages").unwrap();
+    let (type_registry, index_schema) = build_space();
     let mgr = SpaceIndexManager::new("test", &index_path);
-    mgr.rebuild(wiki_root, dir, &schema(), &registry()).unwrap();
-    mgr.open(&schema(), None).unwrap();
+    mgr.rebuild(wiki_root, dir, &index_schema, &type_registry)
+        .unwrap();
+    mgr.open(&index_schema, None).unwrap();
 
     let space = Arc::new(SpaceContext {
         name: "test".to_string(),
         wiki_root: wiki_root.to_path_buf(),
         repo_root: dir.to_path_buf(),
-        type_registry: Arc::new(registry()),
-        index_schema: schema(),
+        type_registry: Arc::new(type_registry),
+        index_schema,
         index_manager: Arc::new(mgr),
         graph_cache: llm_wiki::graph::WikiGraphCache::NoSnapshot(
             petgraph_live::cache::GenerationCache::new(),
@@ -139,6 +149,68 @@ fn orphan_ignores_section_pages() {
     assert!(
         !slugs.contains(&"concepts".to_string()),
         "section index pages should not be flagged as orphans"
+    );
+}
+
+#[test]
+fn orphan_credits_targets_of_custom_edge_fields() {
+    let dir = tempfile::tempdir().unwrap();
+    let wiki_root = setup_repo(dir.path());
+
+    // Register a custom `decision` type declaring `supersedes` via
+    // x-graph-edges, on top of the default schemas.
+    let schemas_dir = dir.path().join("schemas");
+    fs::create_dir_all(&schemas_dir).unwrap();
+    for (filename, content) in llm_wiki::default_schemas::default_schemas() {
+        fs::write(schemas_dir.join(filename), content).unwrap();
+    }
+    fs::write(
+        schemas_dir.join("decision.json"),
+        r#"{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "x-wiki-types": { "decision": "A decision record" },
+  "type": "object",
+  "required": ["title", "type"],
+  "properties": {
+    "title": { "type": "string" },
+    "type": { "type": "string" },
+    "supersedes": { "type": "string" }
+  },
+  "x-graph-edges": {
+    "supersedes": { "relation": "supersedes" }
+  },
+  "additionalProperties": true
+}"#,
+    )
+    .unwrap();
+
+    // A declares a stable id; B supersedes A by that ULID. `supersedes` is
+    // not one of the built-in edge fields — only the registry knows it.
+    write_page(
+        &wiki_root,
+        "decisions/a.md",
+        "---\ntitle: \"A\"\ntype: decision\nid: 01ARZ3NDEKTSV4RRFFQ69G5FAV\n---\n\nOld decision.\n",
+    );
+    write_page(
+        &wiki_root,
+        "decisions/b.md",
+        "---\ntitle: \"B\"\ntype: decision\nsupersedes: 01ARZ3NDEKTSV4RRFFQ69G5FAV\n---\n\nNew decision.\n",
+    );
+
+    let engine = build_engine_with(dir.path(), &wiki_root, || {
+        space_builder::build_space(dir.path(), "en_stem").unwrap()
+    });
+    let report = run_lint(&engine, "test", Some("orphan"), None).unwrap();
+    let slugs = slugs_for_rule(&report.findings, "orphan");
+
+    assert!(
+        !slugs.contains(&"decisions/a".to_string()),
+        "A is the target of a registered x-graph-edges field (supersedes), \
+         so it must not be flagged as an orphan: {slugs:?}"
+    );
+    assert!(
+        slugs.contains(&"decisions/b".to_string()),
+        "B has no incoming links so it is the orphan: {slugs:?}"
     );
 }
 

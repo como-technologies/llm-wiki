@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`orphan` lint rule sees custom edge fields** — the set of frontmatter fields that credit incoming links is now the union of the built-in defaults (`sources`, `concepts`, `document_refs`, `superseded_by`) and every field declared via `x-graph-edges` by a registered type, instead of a hardcoded list. A page targeted only through a custom edge field (e.g. a `decision` type's `supersedes`) is no longer falsely reported as an orphan (#12)
 - Pinned `agent-client-protocol` to 0.14 — the 0.15 bump (#78) landed without migrating `src/acp` to the restructured `schema` module, leaving `main` uncompilable
 
 ## [0.4.1] -  2026-05-08

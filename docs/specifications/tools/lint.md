@@ -76,10 +76,14 @@ Empty `findings` array = clean wiki. CLI exits non-zero when any
 
 ### orphan
 
-Builds a set of all slugs referenced in `body_links`, `sources`,
-`concepts`, `document_refs`, and `superseded_by` across all pages.
-Any page slug not in that set is an orphan. Section pages (`type:
-section`) and root index pages are exempt.
+Builds a set of all slugs referenced in `body_links` and frontmatter
+edge fields across all pages. The edge-field set is the union of the
+built-in defaults (`sources`, `concepts`, `document_refs`,
+`superseded_by`) and every field declared via `x-graph-edges` by a
+registered type — the same registry declarations the graph builder
+uses — so custom edge fields (e.g. a `decision` type's `supersedes`)
+credit their targets. Any page slug not in that set is an orphan.
+Section pages (`type: section`) and root index pages are exempt.
 
 ### broken-link
 

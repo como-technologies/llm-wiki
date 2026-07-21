@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -17,6 +17,7 @@ use crate::engine::EngineState;
 use crate::graph::{GraphFilter, WikiGraph, get_or_build_graph};
 use crate::index_schema::IndexSchema;
 use crate::slug::Slug;
+use crate::type_registry::SpaceTypeRegistry;
 
 /// Severity level of a lint finding.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -105,7 +106,7 @@ pub fn run_lint(
     let mut findings: Vec<LintFinding> = Vec::new();
 
     if active_rules.contains("orphan") {
-        findings.extend(rule_orphan(&searcher, is, wiki_root)?);
+        findings.extend(rule_orphan(&searcher, is, wiki_root, &space.type_registry)?);
     }
     if active_rules.contains("broken-link") || active_rules.contains("broken-cross-wiki-link") {
         let mounted: HashSet<String> = engine.spaces.keys().cloned().collect();
@@ -221,6 +222,7 @@ fn rule_orphan(
     searcher: &tantivy::Searcher,
     is: &IndexSchema,
     wiki_root: &Path,
+    registry: &SpaceTypeRegistry,
 ) -> Result<Vec<LintFinding>> {
     let f_slug = is.field("slug");
     let f_type = is.field("type");
@@ -259,6 +261,15 @@ fn rule_orphan(
         }
     };
 
+    // Frontmatter edge fields count as incoming-link evidence. The set is
+    // the union of the built-in defaults and every registered type's
+    // `x-graph-edges` declarations — the same registry source the graph
+    // builder uses — so custom edge fields credit their targets too.
+    let mut edge_fields: BTreeSet<&str> = ["sources", "concepts", "document_refs", "superseded_by"]
+        .into_iter()
+        .collect();
+    edge_fields.extend(registry.all_edge_fields());
+
     for addr in &all_addrs {
         let doc: tantivy::TantivyDocument = searcher.doc(*addr)?;
         for val in doc.get_all(f_body_links) {
@@ -267,7 +278,7 @@ fn rule_orphan(
             }
         }
         // Also count frontmatter edge fields as incoming-link evidence
-        for field_name in &["sources", "concepts", "document_refs", "superseded_by"] {
+        for field_name in &edge_fields {
             if let Some(f) = is.try_field(field_name) {
                 for val in doc.get_all(f) {
                     if let Some(s) = val.as_str() {

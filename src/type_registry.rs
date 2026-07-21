@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 
 use anyhow::{Result, bail};
@@ -161,6 +161,15 @@ impl SpaceTypeRegistry {
             .get(type_name)
             .map(|rt| rt.required_fields.clone())
             .unwrap_or_default()
+    }
+
+    /// Union of frontmatter edge-field names declared via `x-graph-edges`
+    /// across all registered types.
+    pub fn all_edge_fields(&self) -> BTreeSet<&str> {
+        self.types
+            .values()
+            .flat_map(|rt| rt.edges.iter().map(|e| e.field.as_str()))
+            .collect()
     }
 
     /// Get edge declarations for a type.
