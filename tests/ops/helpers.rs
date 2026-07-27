@@ -13,12 +13,12 @@ pub fn setup_wiki(dir: &Path, name: &str) -> std::path::PathBuf {
     fs::create_dir_all(wiki_root.join("concepts")).unwrap();
     fs::write(
         wiki_root.join("concepts/moe.md"),
-        "---\ntitle: \"MoE\"\ntype: concept\nstatus: active\ntags: [ml]\n---\n\nMixture of Experts.\n",
+        "---\ntitle: \"MoE\"\ntype: concept\nstatus: active\ntags: [ml]\nread_when: [testing]\n---\n\nMixture of Experts.\n",
     )
     .unwrap();
     fs::write(
         wiki_root.join("concepts/transformer.md"),
-        "---\ntitle: \"Transformer\"\ntype: concept\nstatus: active\n---\n\nAttention is all you need. See [[concepts/moe]].\n",
+        "---\ntitle: \"Transformer\"\ntype: concept\nstatus: active\nread_when: [testing]\n---\n\nAttention is all you need. See [[concepts/moe]].\n",
     )
     .unwrap();
     git::commit(&wiki_path, "add pages").unwrap();

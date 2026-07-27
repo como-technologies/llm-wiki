@@ -26,7 +26,7 @@ fn schema_list_returns_all_default_types() {
     let eng = mgr.state.read().unwrap();
 
     let entries = ops::schema_list(&eng, "test").unwrap();
-    assert_eq!(entries.len(), 15);
+    assert_eq!(entries.len(), 20);
 
     let names: Vec<&str> = entries.iter().map(|e| e.name.as_str()).collect();
     assert!(names.contains(&"default"));
@@ -35,6 +35,12 @@ fn schema_list_returns_all_default_types() {
     assert!(names.contains(&"paper"));
     assert!(names.contains(&"doc"));
     assert!(names.contains(&"section"));
+    // Como schema library (llm-wiki#14)
+    assert!(names.contains(&"decision"));
+    assert!(names.contains(&"guide"));
+    assert!(names.contains(&"glossary-entry"));
+    assert!(names.contains(&"worked-example"));
+    assert!(names.contains(&"plan"));
 }
 
 // ── schema show ───────────────────────────────────────────────────────────────
@@ -376,6 +382,15 @@ fn schema_remove_cannot_remove_default() {
 fn schema_change_makes_index_stale() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path());
+
+    // Provisioning pins index.auto_rebuild = true (llm-wiki#14); turn it off
+    // here so staleness can be observed instead of self-healing on build.
+    {
+        let mut global = llm_wiki::config::load_global(&config_path).unwrap();
+        global.index.auto_rebuild = false;
+        llm_wiki::config::save_global(&global, &config_path).unwrap();
+    }
+
     let mgr = engine(&config_path);
 
     // Index is current after build

@@ -51,13 +51,43 @@ Creates the following structure (see
 │   ├── paper.json
 │   ├── skill.json
 │   ├── doc.json
-│   └── section.json
+│   ├── section.json
+│   ├── decision.json      ← Como schema library (llm-wiki#14)
+│   ├── guide.json
+│   ├── glossary-entry.json
+│   ├── worked-example.json
+│   └── plan.json
 ├── inbox/
 ├── evidence/
 └── wiki/              ← or the value of --wiki-root
 ```
 
 Initial git commit: `create: <name>`.
+
+### Admission provisioning
+
+`spaces create` provisions the git-native admission model (llm-wiki#14,
+kb-spec §3/§4/§7). Idempotent on every path, including re-create of an
+already-registered space:
+
+- **Git hooks** — `pre-commit` runs `ingest . --dry-run` (strict validation;
+  an invalid page fails the commit), `post-commit` runs `ingest .` (indexes
+  the committed delta). The hooks embed the creating binary's path and the
+  registry config, so a bare `git commit` works from any shell. A hook file
+  without the `managed by \`llm-wiki spaces create\`` marker is user-owned
+  and never overwritten; delete a managed hook to opt out. Hooks fire only
+  for real `git` invocations — the engine's own libgit2 commits (`ingest`,
+  `content commit`) never execute them, so the chain terminates by
+  construction.
+- **`wiki.toml` defaults** — `[validation] type_strictness = "strict"` and
+  `[search.status]` weights for both status vocabularies (decision lifecycle
+  and content), written per-space so the admission contract travels with the
+  data. Only written when `wiki.toml` does not already exist.
+- **Global config** — `index.auto_rebuild = true` (catch-up-on-read), set
+  once in the registry config.
+
+`spaces register` performs none of this — an existing space's configuration
+is its own.
 
 On first run, the wiki becomes the default one. Also ensures
 `~/.llm-wiki/` infrastructure exists (config.toml, indexes/, logs/).

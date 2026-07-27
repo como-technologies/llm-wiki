@@ -685,3 +685,145 @@ fn register_existing_no_prior_toml_creates_wiki_toml() {
         "schemas/ must contain default schema files"
     );
 }
+
+// ── Como provisioning (llm-wiki#14) ───────────────────────────────────────────
+
+#[test]
+fn create_installs_como_schema_library() {
+    let dir = tempfile::tempdir().unwrap();
+    let wiki_path = dir.path().join("kb");
+    let cfg = config_path(dir.path());
+
+    spaces::create(&wiki_path, "kb", None, false, false, &cfg, None).unwrap();
+
+    for schema in [
+        "decision.json",
+        "guide.json",
+        "glossary-entry.json",
+        "worked-example.json",
+        "plan.json",
+    ] {
+        assert!(
+            wiki_path.join("schemas").join(schema).is_file(),
+            "missing Como schema {schema}"
+        );
+    }
+}
+
+#[test]
+fn create_provisions_strict_validation_and_search_weights() {
+    let dir = tempfile::tempdir().unwrap();
+    let wiki_path = dir.path().join("kb");
+    let cfg = config_path(dir.path());
+
+    spaces::create(&wiki_path, "kb", None, false, false, &cfg, None).unwrap();
+
+    let wiki_cfg = load_wiki(&wiki_path).unwrap();
+    assert_eq!(
+        wiki_cfg.validation.as_ref().unwrap().type_strictness,
+        "strict",
+        "provisioned spaces pin strict admission (kb-spec §3)"
+    );
+
+    // Both status vocabularies (kb-spec §4): decision lifecycle + content.
+    let status = &wiki_cfg.search.as_ref().unwrap().status;
+    for key in [
+        "proposed",
+        "accepted",
+        "rejected",
+        "deprecated",
+        "superseded",
+        "active",
+        "draft",
+        "stub",
+        "generated",
+        "archived",
+        "unknown",
+    ] {
+        assert!(status.contains_key(key), "missing search.status.{key}");
+    }
+    // The spike-verified anchor points (kb-spike findings/issue-03).
+    assert_eq!(status["accepted"], 1.0);
+    assert_eq!(status["superseded"], 0.3);
+}
+
+#[test]
+fn create_installs_admission_hooks() {
+    let dir = tempfile::tempdir().unwrap();
+    let wiki_path = dir.path().join("kb");
+    let cfg = config_path(dir.path());
+
+    spaces::create(&wiki_path, "kb", None, false, false, &cfg, None).unwrap();
+
+    let hooks = wiki_path.join(".git").join("hooks");
+    let pre = std::fs::read_to_string(hooks.join("pre-commit")).unwrap();
+    let post = std::fs::read_to_string(hooks.join("post-commit")).unwrap();
+
+    assert!(pre.contains("managed by `llm-wiki spaces create`"));
+    assert!(
+        pre.contains("ingest . --dry-run"),
+        "pre-commit is the validate-only gate"
+    );
+    assert!(
+        post.contains("ingest ."),
+        "post-commit is the index consumer"
+    );
+    assert!(!post.contains("--dry-run"));
+    assert!(pre.contains("--wiki \"kb\""));
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        for hook in ["pre-commit", "post-commit"] {
+            let mode = std::fs::metadata(hooks.join(hook))
+                .unwrap()
+                .permissions()
+                .mode();
+            assert!(mode & 0o111 != 0, "{hook} must be executable");
+        }
+    }
+}
+
+#[test]
+fn create_sets_index_auto_rebuild() {
+    let dir = tempfile::tempdir().unwrap();
+    let wiki_path = dir.path().join("kb");
+    let cfg = config_path(dir.path());
+
+    spaces::create(&wiki_path, "kb", None, false, false, &cfg, None).unwrap();
+
+    let global = load_global(&cfg).unwrap();
+    assert!(
+        global.index.auto_rebuild,
+        "catch-up-on-read is provisioned globally (kb-spec §7)"
+    );
+}
+
+#[test]
+fn recreate_preserves_foreign_hooks() {
+    let dir = tempfile::tempdir().unwrap();
+    let wiki_path = dir.path().join("kb");
+    let cfg = config_path(dir.path());
+
+    spaces::create(&wiki_path, "kb", None, false, false, &cfg, None).unwrap();
+
+    // A user replaces the pre-commit hook with their own.
+    let pre = wiki_path.join(".git").join("hooks").join("pre-commit");
+    std::fs::write(&pre, "#!/bin/sh\n# my own hook\nexit 0\n").unwrap();
+
+    // Idempotent re-create must not clobber it.
+    spaces::create(&wiki_path, "kb", None, false, false, &cfg, None).unwrap();
+    let content = std::fs::read_to_string(&pre).unwrap();
+    assert!(
+        content.contains("my own hook"),
+        "foreign hook was clobbered"
+    );
+
+    // Our own hooks are still re-ensured.
+    let post = wiki_path.join(".git").join("hooks").join("post-commit");
+    assert!(
+        std::fs::read_to_string(post)
+            .unwrap()
+            .contains("managed by `llm-wiki spaces create`")
+    );
+}

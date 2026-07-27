@@ -70,6 +70,7 @@ pub fn create(
     {
         if existing.name == name {
             ensure_structure(&path, name, description, wiki_root)?;
+            provision_admission(&path, name, config_path)?;
             return Ok(CreateReport {
                 path: path.to_string_lossy().into(),
                 name: name.into(),
@@ -116,6 +117,8 @@ pub fn create(
             std::fs::create_dir_all(&logs_dir)?;
         }
     }
+
+    provision_admission(&path, name, config_path)?;
 
     if set_default {
         set_default_wiki(name, config_path)?;
@@ -271,7 +274,96 @@ fn generate_wiki_toml(name: &str, description: Option<&str>, wiki_root: &str) ->
     if wiki_root != "wiki" {
         s.push_str(&format!("wiki_root = \"{wiki_root}\"\n"));
     }
+
+    // Como provisioning defaults (llm-wiki#14) — written per-space so the
+    // admission contract travels with the data, not the machine.
+    s.push_str(
+        "\n\
+         # Strict admission (kb-spec §3): every frontmatter violation fails ingest.\n\
+         [validation]\n\
+         type_strictness = \"strict\"\n\
+         \n\
+         # Search score multipliers for both status vocabularies (kb-spec §4):\n\
+         # the decision lifecycle and the engine content vocabulary.\n\
+         [search.status]\n\
+         proposed = 0.7\n\
+         accepted = 1.0\n\
+         rejected = 0.9\n\
+         deprecated = 0.3\n\
+         superseded = 0.3\n\
+         active = 1.0\n\
+         draft = 0.8\n\
+         stub = 0.5\n\
+         generated = 0.8\n\
+         archived = 0.3\n\
+         unknown = 0.9\n",
+    );
     s
+}
+
+// ── Como admission provisioning (llm-wiki#14) ─────────────────────────────────
+
+/// Marker line identifying hooks this engine manages; a hook file without it
+/// is user-owned and never overwritten.
+const HOOK_MARKER: &str = "managed by `llm-wiki spaces create`";
+
+/// Provision the admission model for a space: the two git hooks that make a
+/// commit the unit of admission (kb-spec §7), plus catch-up-on-read
+/// (`index.auto_rebuild`) in the global config. Idempotent on every path.
+fn provision_admission(path: &Path, name: &str, config_path: &Path) -> Result<()> {
+    install_admission_hooks(path, name, config_path)?;
+
+    // Catch-up-on-read is the read-side half of the post-commit consumer
+    // model (kb-spike findings/issue-09). Global-only key.
+    let mut global = load_global(config_path)?;
+    if !global.index.auto_rebuild {
+        global.index.auto_rebuild = true;
+        save_global(&global, config_path)?;
+    }
+    Ok(())
+}
+
+/// Write `pre-commit` (validate-only gate) and `post-commit` (index consumer)
+/// into `.git/hooks`. The hooks embed this binary's path and the registry
+/// config so a bare `git commit` in the space works from any shell. Hooks run
+/// only for real `git` invocations — libgit2 commits (the engine's own
+/// `ingest`/`content commit`) never execute them, so no recursion is possible.
+fn install_admission_hooks(path: &Path, name: &str, config_path: &Path) -> Result<()> {
+    if !path.join(".git").exists() {
+        return Ok(());
+    }
+    let hooks_dir = path.join(".git").join("hooks");
+    std::fs::create_dir_all(&hooks_dir)?;
+
+    let exe = std::env::current_exe()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| "llm-wiki".into());
+    let cfg = std::path::absolute(config_path)
+        .unwrap_or_else(|_| config_path.to_path_buf())
+        .to_string_lossy()
+        .into_owned();
+
+    for (hook, dry_run) in [("pre-commit", " --dry-run"), ("post-commit", "")] {
+        let dest = hooks_dir.join(hook);
+        if dest.exists() {
+            let existing = std::fs::read_to_string(&dest).unwrap_or_default();
+            if !existing.contains(HOOK_MARKER) {
+                continue; // user-owned hook — leave it alone
+            }
+        }
+        let script = format!(
+            "#!/bin/sh\n\
+             # llm-wiki admission gate — {HOOK_MARKER}; delete to opt out.\n\
+             exec \"{exe}\" --config \"{cfg}\" --wiki \"{name}\" ingest .{dry_run}\n"
+        );
+        std::fs::write(&dest, script)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o755))?;
+        }
+    }
+    Ok(())
 }
 
 /// Validate `wiki_root` before using it at registration time.

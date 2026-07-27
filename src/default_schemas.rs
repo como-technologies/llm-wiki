@@ -7,6 +7,14 @@ const SKILL: &str = include_str!("../schemas/skill.json");
 const DOC: &str = include_str!("../schemas/doc.json");
 const SECTION: &str = include_str!("../schemas/section.json");
 
+// Como schema library (kb-spec §2): the typed-page contract classes,
+// shipped in-engine so every provisioned space carries them (llm-wiki#14).
+const DECISION: &str = include_str!("../schemas/decision.json");
+const GUIDE: &str = include_str!("../schemas/guide.json");
+const GLOSSARY_ENTRY: &str = include_str!("../schemas/glossary-entry.json");
+const WORKED_EXAMPLE: &str = include_str!("../schemas/worked-example.json");
+const PLAN: &str = include_str!("../schemas/plan.json");
+
 const TMPL_CONCEPT: &str = include_str!("../schemas/concept.md");
 const TMPL_PAPER: &str = include_str!("../schemas/paper.md");
 const TMPL_DOC: &str = include_str!("../schemas/doc.md");
@@ -22,6 +30,11 @@ pub fn default_schemas() -> HashMap<&'static str, &'static str> {
         ("skill.json", SKILL),
         ("doc.json", DOC),
         ("section.json", SECTION),
+        ("decision.json", DECISION),
+        ("guide.json", GUIDE),
+        ("glossary-entry.json", GLOSSARY_ENTRY),
+        ("worked-example.json", WORKED_EXAMPLE),
+        ("plan.json", PLAN),
     ])
 }
 

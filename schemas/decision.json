@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/como-technologies/llm-wiki/schemas/v0.1.0/decision.json",
+  "title": "Decision type",
+  "description": "Architecture/operating decision record (ADR). Status vocabulary and link fields aligned to adroit's Adr/Status (adroit/src/adr.rs); numbering deliberately absent — it belongs to the head (kb-spike#6). Confidence is deliberately absent: decisions never declare it and are un-stale by design (kb-spike findings/issue-03, issue-04).",
+  "type": "object",
+  "required": ["title", "type", "status", "created"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "Stable opaque page identifier (ULID, tool-generated). Links target this, not the path (kb-spike#1)."
+    },
+    "title": { "type": "string", "description": "Short title describing the decision" },
+    "reference": {
+      "type": "string",
+      "description": "Head-owned display identity (e.g. ADR-0006, 20260720-use-postgres). Allocated and written by adroit; the substrate only stores it (kb-spike#6). Distinct from id (routing identity)."
+    },
+    "type": { "type": "string", "description": "Page type from registry" },
+    "status": {
+      "type": "string",
+      "enum": ["proposed", "accepted", "rejected", "deprecated", "superseded"],
+      "description": "Decision lifecycle, aligned to adroit Status"
+    },
+    "created": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "ISO 8601 date the decision record was created"
+    },
+    "deciders": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "People/roles who made the call"
+    },
+    "supersedes": {
+      "type": "string",
+      "description": "Id (preferred) or slug of the older decision this one replaces"
+    },
+    "superseded_by": {
+      "type": "string",
+      "description": "Id (preferred) or slug of the newer decision replacing this one"
+    },
+    "relates_to": { "type": "array", "items": { "type": "string" }, "description": "Ids/slugs of related decisions" },
+    "depends_on": { "type": "array", "items": { "type": "string" }, "description": "Ids/slugs of decisions this one depends on" },
+    "refines": { "type": "array", "items": { "type": "string" }, "description": "Ids/slugs of decisions this one refines" },
+    "review_by": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "Review deadline while status is proposed"
+    },
+    "summary": { "type": "string", "description": "One-line scope" },
+    "last_updated": { "type": "string", "description": "ISO 8601 date of last substantive edit" },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "citations": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Pinned path@commit evidence refs. Non-edge by design — interim home until the citation link kind lands (llm-wiki#8); edge fields would mis-parse pinned refs as slugs (kb-spike findings/issue-09)."
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "superseded" } }, "required": ["status"] },
+      "then": { "required": ["superseded_by"] }
+    }
+  ],
+  "x-wiki-types": {
+    "decision": "Architecture/operating decision record"
+  },
+  "x-graph-edges": {
+    "supersedes": { "relation": "supersedes", "direction": "outgoing", "target_types": ["decision"] },
+    "superseded_by": { "relation": "superseded-by", "direction": "outgoing", "target_types": ["decision"] },
+    "relates_to": { "relation": "relates-to", "direction": "outgoing", "target_types": ["decision"] },
+    "depends_on": { "relation": "depends-on", "direction": "outgoing", "target_types": ["decision"] },
+    "refines": { "relation": "refines", "direction": "outgoing", "target_types": ["decision"] }
+  },
+  "additionalProperties": false
+}

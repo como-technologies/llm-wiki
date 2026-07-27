@@ -18,7 +18,7 @@ fn ingest_validates_and_indexes() {
         let space = engine.space("test").unwrap();
         fs::write(
             space.wiki_root.join("concepts/rag.md"),
-            "---\ntitle: \"RAG\"\ntype: concept\nstatus: active\n---\n\nRetrieval-augmented generation.\n",
+            "---\ntitle: \"RAG\"\ntype: concept\nstatus: active\nread_when: [testing]\n---\n\nRetrieval-augmented generation.\n",
         )
         .unwrap();
     }
@@ -70,7 +70,7 @@ fn ingest_warns_on_wrong_edge_target_type() {
     fs::create_dir_all(wiki_root.join("concepts")).unwrap();
     fs::write(
         wiki_root.join("concepts/bad.md"),
-        "---\ntitle: \"Bad\"\ntype: concept\nstatus: active\nsources:\n  - concepts/moe\n---\n\nBody.\n",
+        "---\ntitle: \"Bad\"\ntype: concept\nstatus: active\nread_when: [testing]\nsources:\n  - concepts/moe\n---\n\nBody.\n",
     )
     .unwrap();
     git::commit(&wiki_path, "add bad page").unwrap();
@@ -107,7 +107,7 @@ fn ingest_no_warning_on_correct_edge_target_type() {
     fs::create_dir_all(wiki_root.join("concepts")).unwrap();
     fs::write(
         wiki_root.join("concepts/good.md"),
-        "---\ntitle: \"Good\"\ntype: concept\nstatus: active\nsources:\n  - sources/paper-a\n---\n\nBody.\n",
+        "---\ntitle: \"Good\"\ntype: concept\nstatus: active\nread_when: [testing]\nsources:\n  - sources/paper-a\n---\n\nBody.\n",
     )
     .unwrap();
     git::commit(&wiki_path, "add pages").unwrap();

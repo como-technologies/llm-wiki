@@ -262,6 +262,19 @@ fn export_json_includes_custom_frontmatter_fields() {
 fn export_json_omits_frontmatter_when_no_extra_fields() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");
+
+    // A page declaring only surfaced fields (title/type/status) — `doc` has no
+    // further required fields, unlike `concept` whose `read_when` would count
+    // as an extra.
+    let wiki_path = dir.path().join("test");
+    std::fs::create_dir_all(wiki_path.join("wiki").join("notes")).unwrap();
+    std::fs::write(
+        wiki_path.join("wiki").join("notes").join("minimal.md"),
+        "---\ntitle: \"Minimal\"\ntype: doc\nstatus: active\n---\n\nBody.\n",
+    )
+    .unwrap();
+    llm_wiki::git::commit(&wiki_path, "add minimal page").unwrap();
+
     let manager = WikiEngine::build(&config_path).unwrap();
     let engine = manager.state.read().unwrap();
 
@@ -280,14 +293,11 @@ fn export_json_omits_frontmatter_when_no_extra_fields() {
         serde_json::from_str(&std::fs::read_to_string(&report.path).unwrap()).unwrap();
     let pages = json.as_array().unwrap();
 
-    // transformer declares only title/type/status — all surfaced top-level,
+    // minimal declares only title/type/status — all surfaced top-level,
     // so the frontmatter object is omitted and the old shape is preserved
-    let transformer = pages
-        .iter()
-        .find(|p| p["slug"] == "concepts/transformer")
-        .unwrap();
+    let minimal = pages.iter().find(|p| p["slug"] == "notes/minimal").unwrap();
     assert!(
-        transformer.get("frontmatter").is_none(),
+        minimal.get("frontmatter").is_none(),
         "frontmatter must be omitted when the page has no extra fields"
     );
 

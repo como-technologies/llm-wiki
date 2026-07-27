@@ -36,6 +36,11 @@ Shipped as default schema files by `llm-wiki spaces create`:
 | [skill](types/skill.md)                   | `skill.json`   | Agent skill with workflow instructions                       |
 | [doc](types/doc.md)                       | `doc.json`     | Reference document with agent-foundation frontmatter         |
 | [section](types/section.md)               | `section.json` | Section index grouping related pages                         |
+| decision                                  | `decision.json` | Architecture/operating decision record (Como library, llm-wiki#14) |
+| guide                                     | `guide.json`   | How-to / runbook content (Como library)                      |
+| glossary-entry                            | `glossary-entry.json` | One term, one page (Como library)                     |
+| worked-example                            | `worked-example.json` | Concrete end-to-end demonstration (Como library)      |
+| plan                                      | `plan.json`    | Actionable plan derived from a decision (Como library)       |
 
 ## How It Works
 

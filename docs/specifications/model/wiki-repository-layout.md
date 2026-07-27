@@ -27,7 +27,12 @@ my-wiki/                    ← git root (repository root)
 │   ├── doc.json
 │   ├── doc.md              ← body template (optional)
 │   ├── section.json
-│   └── section.md          ← body template (optional)
+│   ├── section.md          ← body template (optional)
+│   ├── decision.json       ← Como schema library (llm-wiki#14)
+│   ├── guide.json
+│   ├── glossary-entry.json
+│   ├── worked-example.json
+│   └── plan.json
 ├── inbox/                  ← drop zone (human puts files here)
 ├── evidence/               ← immutable capture layer (originals preserved)
 └── wiki/                   ← compiled knowledge (default; configurable via wiki_root)

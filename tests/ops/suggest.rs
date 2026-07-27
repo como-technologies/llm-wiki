@@ -72,7 +72,7 @@ fn suggest_on_empty_wiki() {
     fs::create_dir_all(wiki_root.join("concepts")).unwrap();
     fs::write(
         wiki_root.join("concepts/lonely.md"),
-        "---\ntitle: \"Lonely\"\ntype: concept\nstatus: active\n---\n\nAlone.\n",
+        "---\ntitle: \"Lonely\"\ntype: concept\nstatus: active\nread_when: [testing]\n---\n\nAlone.\n",
     )
     .unwrap();
     git::commit(&wiki_path, "add page").unwrap();
