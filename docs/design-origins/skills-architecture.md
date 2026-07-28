@@ -1,13 +1,13 @@
 ---
 title: "Skills Architecture"
-summary: "How LLM skill playbooks relate to llm-wiki — skills are external to the engine, live in the wiki repo, read by the IDE/plugin directly."
+summary: "How LLM skill guides relate to llm-wiki — skills are external to the engine, live in the wiki repo, read by the IDE/plugin directly."
 status: draft
 last_updated: "2025-07-15"
 ---
 
 # Skills Architecture
 
-Skills are detailed LLM playbooks that guide an external LLM through
+Skills are detailed LLM instruction guides that lead an external LLM through
 multi-step wiki workflows. **The engine does not manage skills.** Skills
 are a separate concern — installed, read, and executed by the IDE, the
 plugin system, or the user.
@@ -36,7 +36,7 @@ lines each. That level of detail belongs outside the engine.
 |---------|------------|
 | Tools (`wiki_search`, `wiki_write`, etc.) | Engine |
 | Engine reference (commands, config, structure) | Engine (`llm-wiki instruct`) |
-| Skill playbooks (ingest, crystallize, etc.) | External — IDE, plugin, user |
+| Skill guides (ingest, crystallize, etc.) | External — IDE, plugin, user |
 | Skill installation | User (clone a repo, copy files) |
 | Skill reading | IDE/plugin (reads `skills/` directly) |
 | Skill execution | IDE's LLM (uses engine tools) |
@@ -55,7 +55,7 @@ skill, each containing a `SKILL.md`:
 my-wiki/
 ├── wiki.toml
 ├── schema.md
-├── skills/                        ← skill playbooks (not managed by engine)
+├── skills/                        ← skill guides (not managed by engine)
 │   ├── ingest/
 │   │   └── SKILL.md
 │   ├── crystallize/
@@ -133,7 +133,7 @@ cd my-wiki && git submodule add https://github.com/.../skills skills
 ```
 
 No skill installed = no skill content. The engine still works — the LLM
-just doesn't have detailed playbooks and relies on the short
+just doesn't have detailed guides and relies on the short
 `instructions.md` orientation.
 
 ---
@@ -155,7 +155,7 @@ The engine is not involved. Each surface reads skills directly:
 ## 7. What the Engine Provides
 
 The engine provides a complete engine reference via `llm-wiki instruct`.
-This is the LLM's documentation of the engine — not a skill playbook.
+This is the LLM's documentation of the engine — not a skill guide.
 
 ### `llm-wiki instruct` (no argument)
 
@@ -173,7 +173,7 @@ Prints a specific section of the engine reference:
 | `frontmatter` | All required fields, type taxonomy, per-type templates, update rules, common mistakes |
 | `research` | How search works, `wiki_search` + `wiki_read` pattern |
 | `lint` | What lint checks, what `wiki_lint` returns, how to interpret the report |
-| `crystallize` | What crystallize means, the concept, when to use it (not the full playbook) |
+| `crystallize` | What crystallize means, the concept, when to use it (not the full guide) |
 | `commit` | What `wiki_commit` does, slug resolution, `--all` vs slugs, default messages |
 | `config` | All config keys, scopes (global vs per-wiki), resolution order |
 | `structure` | Repository layout, slug resolution, flat vs bundle, sections, `wiki://` URIs |
@@ -184,7 +184,7 @@ Prints a specific section of the engine reference:
 tools, what each command does, what frontmatter fields are required, what
 types exist, how pages are structured, how config works."
 
-**Is not:** A skill playbook. `instruct` doesn't tell the LLM how to
+**Is not:** A skill guide. `instruct` doesn't tell the LLM how to
 orchestrate a multi-step workflow. That's what skills do.
 
 Example — frontmatter:
@@ -414,7 +414,7 @@ supports resource access.
 | What | MCP primitive | Source | Always available |
 |------|--------------|--------|------------------|
 | Engine docs (`instruct` sections) | Prompt | Embedded in binary | Yes |
-| Skill playbooks (`SKILL.md`) | Prompt + Resource | `skills/` on disk | Only if installed |
+| Skill guides (`SKILL.md`) | Prompt + Resource | `skills/` on disk | Only if installed |
 
 The engine serves both. It doesn't decide which to use — the LLM or
 client picks the right one based on context.
