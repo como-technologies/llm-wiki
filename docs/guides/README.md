@@ -16,6 +16,7 @@ llm-wiki.
 | Guide                                    | Description                                                                  |
 | ---------------------------------------- | ---------------------------------------------------------------------------- |
 | [writing-content.md](writing-content.md) | Create and update pages: direct write pattern, wiki_resolve, backlinks       |
+| [como-authoring.md](como-authoring.md)   | The Como authoring contract for agents: page classes, decision boundary, confidence flow |
 | [custom-types.md](custom-types.md)       | Add custom page types with JSON Schema                                       |
 | [redaction.md](redaction.md)             | Scrub secrets from page bodies before commit with `redact: true`             |
 | [lint.md](lint.md)                       | Catch broken links, orphans, missing fields, stale pages, and unknown types  |

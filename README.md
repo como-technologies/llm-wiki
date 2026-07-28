@@ -7,6 +7,13 @@ A headless wiki engine for agents. 23 MCP tools. One Rust binary. No LLM inside.
 A git-backed Markdown wiki — searchable, typed, graph-linked. Accessible from
 the command line, from any MCP-compatible agent, or from any IDE via ACP.
 
+This fork is the **Como KB product**: it ships the Como schema library and
+zero-flag admission provisioning in `spaces create`, and the
+**[Como authoring kit](kit/README.md)** — skills, harness configs, the
+[authoring contract](docs/guides/como-authoring.md), and a captured
+worked example — for pointing an AI harness at a space and authoring
+content that lands in the right shape.
+
 ---
 
 ## The problem with RAG

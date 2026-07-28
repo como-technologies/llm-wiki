@@ -31,3 +31,7 @@ __pycache__/
 *.pyd
 uv.lock
 
+
+# The kit ships template copies of files the repo otherwise ignores
+!kit/claude-code/.mcp.json
+!kit/claude-code/CLAUDE.md
