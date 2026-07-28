@@ -43,9 +43,10 @@ kit/
 ## Setup — Claude Desktop
 
 See [claude-desktop/README.md](claude-desktop/README.md). Content classes
-(`guide`, `glossary-entry`, `worked-example`) work today over MCP;
-`decision` authoring needs adroit and arrives with its guarded MCP write
-slice (portfolio#7, wave 2) — until then decisions are read-only there.
+(`guide`, `glossary-entry`, `worked-example`) work over llm-wiki's MCP
+server; decisions work through adroit's guarded MCP write slice
+(`adroit mcp --allow-write`, its ADR-0021) — destructive-annotated tools
+the human approves per call.
 
 ## Why the suite's CI gates don't use `spaces create`
 

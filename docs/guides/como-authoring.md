@@ -47,10 +47,11 @@ gate-5 finding). When the conversation produces a decision:
 
 - In a harness with shell access (Claude Code): drive the adroit CLI —
   `adroit new`, `draft`, `compose`, `set-status`, `plan --save`.
-- In an MCP-only harness (Claude Desktop): decisions are read-only until
-  adroit's guarded MCP write slice lands (portfolio#7, wave 2). Author
-  the surrounding guides and glossary entries; hand the decision text to
-  a human or a shell-capable session.
+- In an MCP-only harness (Claude Desktop): drive adroit's guarded MCP
+  write slice (`adroit mcp --allow-write`, its ADR-0021) — `new`,
+  `compose`, `set-status`, `plan --save` as destructive-annotated tools
+  the human approves per call. The interactive `draft` interview and the
+  forge integrations stay CLI-only by design.
 
 ## Born generated, promoted on review
 
