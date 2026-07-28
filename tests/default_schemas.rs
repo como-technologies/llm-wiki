@@ -13,7 +13,7 @@ fn compile(name: &str) -> Validator {
 
 #[test]
 fn schema_count() {
-    assert_eq!(default_schemas().len(), 11);
+    assert_eq!(default_schemas().len(), 12);
 }
 
 #[test]
@@ -189,9 +189,9 @@ fn all_schemas_have_x_wiki_types() {
 }
 
 #[test]
-fn default_type_entries_discovers_all_20_types() {
+fn default_type_entries_discovers_all_21_types() {
     let entries = llm_wiki::default_schemas::default_type_entries();
-    assert_eq!(entries.len(), 20);
+    assert_eq!(entries.len(), 21);
 
     let names: Vec<&str> = entries.iter().map(|e| e.type_name.as_str()).collect();
     assert!(names.contains(&"default"));
@@ -215,6 +215,7 @@ fn default_type_entries_discovers_all_20_types() {
     assert!(names.contains(&"glossary-entry"));
     assert!(names.contains(&"worked-example"));
     assert!(names.contains(&"plan"));
+    assert!(names.contains(&"measure-report"));
 }
 
 #[test]

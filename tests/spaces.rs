@@ -702,6 +702,7 @@ fn create_installs_como_schema_library() {
         "glossary-entry.json",
         "worked-example.json",
         "plan.json",
+        "measure-report.json",
     ] {
         assert!(
             wiki_path.join("schemas").join(schema).is_file(),

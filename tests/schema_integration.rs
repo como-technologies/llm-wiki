@@ -26,7 +26,7 @@ fn schema_list_returns_all_default_types() {
     let eng = mgr.state.read().unwrap();
 
     let entries = ops::schema_list(&eng, "test").unwrap();
-    assert_eq!(entries.len(), 20);
+    assert_eq!(entries.len(), 21);
 
     let names: Vec<&str> = entries.iter().map(|e| e.name.as_str()).collect();
     assert!(names.contains(&"default"));
@@ -38,6 +38,7 @@ fn schema_list_returns_all_default_types() {
     // Como schema library (llm-wiki#14)
     assert!(names.contains(&"decision"));
     assert!(names.contains(&"guide"));
+    assert!(names.contains(&"measure-report"));
     assert!(names.contains(&"glossary-entry"));
     assert!(names.contains(&"worked-example"));
     assert!(names.contains(&"plan"));

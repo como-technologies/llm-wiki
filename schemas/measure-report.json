@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/como-technologies/llm-wiki/schemas/v0.1.0/measure-report.json",
+  "title": "Measure report type",
+  "description": "One Measure-stage report as a typed page (kb-spec §2; portfolio#7 wave 4). Emitted mechanically by the Measure heads — tuesday's quantitative capacity report today; pulse's qualitative aggregate when it un-parks — so adoption evidence is harness-queryable beside the decisions it attributes to.",
+  "type": "object",
+  "required": ["title", "type", "status", "period", "instrument"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "Stable opaque page identifier (ULID, tool-generated)."
+    },
+    "title": { "type": "string", "description": "Display name" },
+    "type": { "type": "string", "description": "Page type from registry" },
+    "status": {
+      "type": "string",
+      "enum": ["active", "draft", "stub", "generated"],
+      "description": "Content lifecycle state. Mechanical reports are emitted `active`: deterministic tool output, not model prose."
+    },
+    "summary": { "type": "string", "description": "One-line report headline" },
+    "period": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}$",
+      "description": "The calendar month the report covers (YYYY-MM); reports are keyed to explicit months by decision."
+    },
+    "instrument": {
+      "type": "string",
+      "description": "The emitting Measure head (e.g. \"tuesday\", \"pulse\")."
+    },
+    "source": {
+      "type": "string",
+      "description": "Where the underlying signal came from (e.g. \"gitea:como\", \"github:acme\", a survey id)."
+    },
+    "repos": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Repositories the report aggregates (quantitative reports)."
+    },
+    "total_hours": {
+      "type": "number",
+      "description": "Allocated hours across the period (quantitative reports)."
+    },
+    "unallocated_hours": {
+      "type": "number",
+      "description": "Hours from merged PRs carrying no effort score."
+    },
+    "adr_hours": {
+      "type": "object",
+      "additionalProperties": { "type": "number" },
+      "description": "Full allocated hours per decision reference (the adr_totals rollup): attribution answers what a decision cost, never split like categories."
+    },
+    "last_updated": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$",
+      "description": "RFC 3339 timestamp the report was emitted"
+    },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "owner": { "type": "string", "description": "Person, team, or agent responsible" },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Certainty of this page's content. Mechanical reports normally omit it (search-neutral, never stale)."
+    },
+    "citations": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Pinned path@commit evidence refs (non-edge; interim until llm-wiki#8)."
+    },
+    "relates_to": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Ids/slugs of related pages"
+    },
+    "superseded_by": {
+      "type": "string",
+      "description": "Id (preferred) or slug of the replacement page"
+    }
+  },
+  "x-wiki-types": {
+    "measure-report": "One Measure-stage report — adoption evidence as a typed page"
+  },
+  "x-graph-edges": {
+    "relates_to": { "relation": "relates-to", "direction": "outgoing" },
+    "superseded_by": { "relation": "superseded-by", "direction": "outgoing" }
+  },
+  "additionalProperties": false
+}

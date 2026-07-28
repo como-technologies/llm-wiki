@@ -8,12 +8,14 @@ const DOC: &str = include_str!("../schemas/doc.json");
 const SECTION: &str = include_str!("../schemas/section.json");
 
 // Como schema library (kb-spec §2): the typed-page contract classes,
-// shipped in-engine so every provisioned space carries them (llm-wiki#14).
+// shipped in-engine so every provisioned space carries them (llm-wiki#14;
+// measure-report joined at portfolio#7 wave 4 — the Measure heads' class).
 const DECISION: &str = include_str!("../schemas/decision.json");
 const GUIDE: &str = include_str!("../schemas/guide.json");
 const GLOSSARY_ENTRY: &str = include_str!("../schemas/glossary-entry.json");
 const WORKED_EXAMPLE: &str = include_str!("../schemas/worked-example.json");
 const PLAN: &str = include_str!("../schemas/plan.json");
+const MEASURE_REPORT: &str = include_str!("../schemas/measure-report.json");
 
 const TMPL_CONCEPT: &str = include_str!("../schemas/concept.md");
 const TMPL_PAPER: &str = include_str!("../schemas/paper.md");
@@ -35,6 +37,7 @@ pub fn default_schemas() -> HashMap<&'static str, &'static str> {
         ("glossary-entry.json", GLOSSARY_ENTRY),
         ("worked-example.json", WORKED_EXAMPLE),
         ("plan.json", PLAN),
+        ("measure-report.json", MEASURE_REPORT),
     ])
 }
 
