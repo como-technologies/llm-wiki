@@ -32,6 +32,8 @@ them assumes a vendor, cloud, language, or CI system.
 ## Bootstrap a space with it
 
 ```sh
+export LLM_WIKI_CONFIG="$DIR.registry.toml"   # ephemeral space => scoped registry;
+                                              # rm both together, no global litter
 llm-wiki spaces create "$DIR" --name myteam --set-default
 adroit seed --from kit/starter/decisions --dir "$DIR"   # decisions: fresh ULIDs, healed links
 cp -r kit/starter/wiki/. "$DIR/wiki/"                   # glossary + guides (typed pages)
