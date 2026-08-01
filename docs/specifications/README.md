@@ -10,6 +10,14 @@ last_updated: "2026-05-01"
 
 # Specifications
 
+## Como KB
+
+The product-level contract layered on the engine.
+
+| Spec                                   | Description                                                                  |
+| -------------------------------------- | ---------------------------------------------------------------------------- |
+| [como-kb-spec.md](como-kb-spec.md)     | The Como knowledge base — admission model, page-type contracts, substrate/head seam |
+
 ## Model
 
 Data model and knowledge structure.
@@ -75,6 +83,7 @@ How external tools connect.
 
 | Spec                                | Status   |
 | ----------------------------------- | -------- |
+| `como-kb-spec.md`                   | ready    |
 | `model/wiki-repository-layout.md`   | ready    |
 | `model/page-content.md`             | ready    |
 | `model/epistemic-model.md`          | ready    |
